@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Space Journey </title>
+    <style>
+        body { margin: 0; background: #020205; overflow: hidden; font-family: 'Arial', sans-serif; touch-action: none; }
+        canvas { display: block; margin: 0 auto; background: radial-gradient(circle at center, #1b2735 0%, #050508 100%); }
+        #ui { position: absolute; top: 10px; width: 100%; text-align: center; color: #00ffcc; pointer-events: none; z-index: 10; }
+        .controls { position: absolute; top: 55px; width: 100%; text-align: center; pointer-events: auto; }
+        button { background: #00ffcc; border: 2px solid #008877; padding: 10px 25px; font-weight: bold; cursor: pointer; border-radius: 8px; margin: 0 5px; box-shadow: 0 0 15px rgba(0,255,204,0.3); }
+        .stat-box { display: inline-block; margin: 0 15px; font-weight: bold; text-shadow: 2px 2px 4px #000; font-size: 18px; }
+        #record-ui { font-size: 14px; color: #fff; margin-top: 5px; }
+    </style>
+</head>
+<body>
+<button 
+    onclick="window.location.href='index.html'"
+    style="
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: clamp(8px, 2vw, 12px) clamp(15px, 4vw, 25px);
+        font-size: clamp(14px, 2.5vw, 18px);
+        background-color: #ff4757;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-family: sans-serif;
+        font-weight: 600;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        transition: all 0.3s ease;
+        z-index: 9999;
+    "
+    onmouseover="this.style.backgroundColor='#ff6b81'; this.style.transform='scale(1.05)';"
+    onmouseout="this.style.backgroundColor='#ff4757'; this.style.transform='scale(1)';"
+>
+    Chiqish
+</button>
+
+<div id="ui">
+   
+    <div class="stat-box">LEVEL: <span id="lvl">1</span></div>
+    <div class="stat-box">JON: <span id="lives">3</span></div>
+    <div class="stat-box">TAYOQCHALAR: <span id="dist">100</span></div>
+    <div id="record-ui">REKORD (LEVEL): <span id="maxLvl">1</span></div>
+</div>
+
+<div class="controls">
+    <button id="startBtn">BOSHLASH</button>
+    <button id="pauseBtn" style="display:none;">PAUSE</button>
+</div>
+
+<canvas id="game"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const startBtn = document.getElementById("startBtn");
+const pauseBtn = document.getElementById("pauseBtn");
+
+function resize() {
+    canvas.width = window.innerWidth > 450 ? 400 : window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.onresize = resize;
+resize();
+
+// O'yin sozlamalari
+let level = 1;
+let lives = 3;
+let sticksInCurrentLevel = 0;
+let isPaused = true;
+let gameStarted = false;
+let lastPlatformId = null;
+
+// Level tizimi: 1-level 100, keyin 50 tadan qo'shiladi
+const getGoal = (l) => 100 + (l - 1) * 50;
+
+let platforms = [];
+let enemies = [];
+let items = [];
+
+const ship = {
+    x: 0, y: 0, w: 40, h: 45,
+    dy: 0, jump: -12, speed: 0, targetSpeed: 0, friction: 0.88
+};
+
+function createPlatform(y) {
+    let pType = Math.random() < 0.08 ? 'trap' : 'normal'; 
+    let x = Math.random() * (canvas.width - 70);
+    platforms.push({ x, y, w: 70, h: 12, type: pType, id: Math.random() });
+    
+    if (pType === 'normal' && Math.random() < 0.04) {
+        items.push({ x: x + 25, y: y - 30, w: 20, h: 20 });
+    }
+}
+
+function init() {
+    platforms = []; enemies = []; items = [];
+    sticksInCurrentLevel = 0;
+    let startY = canvas.height - 100;
+    
+    // Birinchi kema turadigan tayoqcha
+    platforms.push({ x: canvas.width/2 - 35, y: startY, w: 70, h: 12, type: 'normal', id: 'start' });
+    ship.x = canvas.width/2 - 20;
+    ship.y = startY - ship.h;
+    ship.dy = 0;
+    
+    for(let i=1; i<8; i++) createPlatform(startY - i * 120);
+}
+
+function takeDamage() {
+    lives--;
+    if (lives <= 0) {
+        alert("Barcha jonlaringiz tugadi! O'yin qayta boshlanadi.");
+        level = 1; lives = 3;
+        location.reload();
+    }
+}
+
+function update() {
+    if (isPaused) return;
+
+    // Silliq burilish
+    ship.speed += (ship.targetSpeed - ship.speed) * 0.12;
+    ship.x += ship.speed;
+    ship.targetSpeed *= ship.friction;
+
+    if (ship.x < -20) ship.x = canvas.width;
+    if (ship.x > canvas.width) ship.x = -20;
+
+    ship.dy += 0.4;
+    ship.y += ship.dy;
+
+    // To'qnashuvlar (Tayoqchalar)
+    for (let i = platforms.length - 1; i >= 0; i--) {
+        let p = platforms[i];
+        if (ship.dy > 0 && ship.x + ship.w > p.x && ship.x < p.x + p.w && 
+            ship.y + ship.h > p.y && ship.y + ship.h < p.y + 15) {
+            
+            if (p.type === 'trap') {
+                takeDamage();
+                platforms.splice(i, 1); // Tuzoq yo'qoladi
+                createPlatform(0);
+                ship.dy = -5; 
+            } else {
+                ship.dy = ship.jump;
+                if (lastPlatformId !== p.id) {
+                    sticksInCurrentLevel++;
+                    lastPlatformId = p.id;
+                }
+            }
+        }
+    }
+
+    // Tushib ketsa
+    if (ship.y > canvas.height) {
+        takeDamage();
+        ship.y = canvas.height / 3;
+        ship.dy = 0;
+    }
+
+    // Dushmanlar
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        let e = enemies[i];
+        if (ship.x < e.x + e.w && ship.x + ship.w > e.x && ship.y < e.y + e.h && ship.y + ship.h > e.y) {
+            takeDamage();
+            enemies.splice(i, 1);
+        }
+    }
+
+    // Jon olish
+    for (let i = items.length - 1; i >= 0; i--) {
+        let it = items[i];
+        if (ship.x < it.x + it.w && ship.x + ship.w > it.x && ship.y < it.y + it.h && ship.y + ship.h > it.y) {
+            lives++;
+            items.splice(i, 1);
+        }
+    }
+
+    // Kamera harakati
+    if (ship.y < canvas.height / 2.5) {
+        let diff = canvas.height / 2.5 - ship.y;
+        ship.y = canvas.height / 2.5;
+        platforms.forEach(p => {
+            p.y += diff;
+            if (p.y > canvas.height) {
+                platforms.splice(platforms.indexOf(p), 1);
+                createPlatform(0);
+            }
+        });
+        items.forEach(it => it.y += diff);
+        enemies.forEach(e => e.y += diff);
+        if (Math.random() < 0.006) enemies.push({ x: Math.random()*canvas.width, y: -50, w: 30, h: 30 });
+    }
+
+    // Keyingi levelga o'tish
+    if (sticksInCurrentLevel >= getGoal(level)) {
+        level++;
+        sticksInCurrentLevel = 0;
+        if (level > 20) {
+            alert("TABRIKLAYMIZ! Siz barcha 20 levelni yutdingiz!");
+            location.reload();
+        }
+    }
+
+    draw();
+    requestAnimationFrame(update);
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    document.getElementById("lvl").innerText = level;
+    document.getElementById("lives").innerText = lives;
+    document.getElementById("dist").innerText = Math.max(0, getGoal(level) - sticksInCurrentLevel);
+
+    platforms.forEach(p => {
+        ctx.fillStyle = p.type === 'trap' ? '#ff2200' : '#00ff88';
+        ctx.fillRect(p.x, p.y, p.w, p.h);
+        // Tayoqcha porlashi
+        ctx.shadowBlur = 8; ctx.shadowColor = ctx.fillStyle;
+    });
+    ctx.shadowBlur = 0;
+
+    ctx.font = "20px Arial";
+    items.forEach(it => ctx.fillText("❤️", it.x, it.y + 15));
+
+    // O'zga sayyoraliklar
+    ctx.fillStyle = "#a020f0";
+    enemies.forEach(e => {
+        ctx.beginPath(); ctx.arc(e.x + 15, e.y + 15, 12, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = "#fff"; ctx.fillRect(e.x+8, e.y+10, 4, 4); ctx.fillRect(e.x+18, e.y+10, 4, 4);
+        ctx.fillStyle = "#a020f0";
+    });
+
+    // Kosmik Kema
+    ctx.fillStyle = "#00d2ff";
+    ctx.beginPath();
+    ctx.moveTo(ship.x + 20, ship.y);
+    ctx.lineTo(ship.x, ship.y + 40);
+    ctx.lineTo(ship.x + 40, ship.y + 40);
+    ctx.fill();
+    // Kema olovi
+    if (!isPaused) {
+        ctx.fillStyle = "orange";
+        ctx.fillRect(ship.x + 15, ship.y + 40, 10, 5);
+    }
+}
+
+startBtn.onclick = () => {
+    isPaused = false; gameStarted = true;
+    startBtn.style.display = "none";
+    pauseBtn.style.display = "inline-block";
+    update();
+};
+
+pauseBtn.onclick = () => {
+    isPaused = true;
+    startBtn.style.display = "inline-block";
+    pauseBtn.style.display = "none";
+    startBtn.innerText = "DAVOM ETISH";
+};
+
+// Klaviatura boshqaruvi
+window.onkeydown = (e) => {
+    if (e.code === 'ArrowLeft') ship.targetSpeed = -11;
+    if (e.code === 'ArrowRight') ship.targetSpeed = 11;
+};
+
+// Mobil boshqaruv
+canvas.ontouchstart = (e) => {
+    let tx = e.touches[0].clientX;
+    ship.targetSpeed = tx < window.innerWidth/2 ? -11 : 11;
+};
+
+init();
+draw();
+</script>
+</body>
+</html>

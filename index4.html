@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Labirint </title>
+<style>
+body{
+  margin:0;
+  background:#020617;
+  color:white;
+  font-family:Arial;
+  text-align:center;
+  overflow:hidden;
+}
+canvas{
+  display:block;
+  margin:auto;
+  border:4px solid #38bdf8;
+  background:#020617;
+}
+#ui{font-size:18px;margin:10px;}
+#controls{
+  position:fixed;
+  bottom:10px;
+  left:0; right:0;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+}
+.arrow{
+  width:60px; height:60px;
+  font-size:25px;
+  margin:5px;
+  border-radius:12px;
+  border:none;
+  background:#38bdf8;
+  color:white;
+}
+.arrow:active{ background:#0ea5e9; }
+</style>
+</head>
+<body>
+
+<h2>🧩 Labirint Pro Coin</h2>
+<div id="ui">
+❤️ Jon: <span id="life">5</span> | 🧠 Level: <span id="lvl">1</span> | 💰 Coin: <span id="coin">0</span>
+</div>
+
+<canvas id="game" width="640" height="480"></canvas>
+
+<div id="controls">
+  <button class="arrow" id="up">⬆</button>
+  <div>
+    <button class="arrow" id="left">⬅</button>
+    <button class="arrow" id="down">⬇</button>
+    <button class="arrow" id="right">➡</button>
+  </div>
+</div>
+
+<script>
+const c=document.getElementById("game");
+const ctx=c.getContext("2d");
+const tile=32;
+
+let life=5,level=1,coin=0;
+let maxLevel=5;
+
+const uiLife=document.getElementById("life");
+const uiLevel=document.getElementById("lvl");
+const uiCoin=document.getElementById("coin");
+
+let map,player,enemy,traps,coins;
+let keys={};
+
+onkeydown=e=>keys[e.key]=true;
+onkeyup=e=>keys[e.key]=false;
+
+// OLDINGI CHIROYLI LABIRINT LAVELARI
+const levels=[
+[
+[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+[1,0,0,0,1,0,0,0,0,0,1,0,1,0,0,0,0,0,2,1],
+[1,0,1,0,1,0,1,1,1,0,1,0,1,0,1,1,1,0,1,1],
+[1,0,1,0,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,1],
+[1,0,1,1,1,1,1,0,1,1,1,0,1,1,1,0,1,1,0,1],
+[1,0,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,1],
+[1,1,1,1,1,0,1,1,1,0,1,1,1,0,1,1,1,1,0,1],
+[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,1,0,1],
+[1,0,1,0,1,1,1,0,1,1,1,0,1,1,1,1,0,1,0,1],
+[1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,1],
+[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+],
+// Level 2–5 o‘rtacha devorlar va qiyinchilik
+// oddiy shablon uchun level 2–5 ni shu uslubda
+[
+[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+[1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,2,1],
+[1,0,1,1,1,0,1,0,1,1,1,0,1,0,1,1,1,0,1,1],
+[1,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,1],
+[1,1,1,0,1,1,1,1,1,0,1,1,1,1,1,0,1,1,0,1],
+[1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,1],
+[1,0,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,1,0,1],
+[1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,1,0,1],
+[1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,1,0,1,0,1],
+[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+]
+];
+
+function startMap(){
+ map=levels[Math.min(level-1,levels.length-1)];
+ player={x:48,y:48,r:12,speed:2};
+ enemy={x:300,y:80,r:12,vy:0.5+level*0.2};
+ traps=[];
+ coins=[];
+ // random tuzoqlar
+ for(let i=0;i<level;i++){
+  let tx=Math.floor(Math.random()*(map[0].length-2))+1;
+  let ty=Math.floor(Math.random()*(map.length-2))+1;
+  if(map[ty][tx]===0) traps.push({x:tx*tile,y:ty*tile});
+ }
+ // random coin
+ for(let i=0;i<level+1;i++){
+  let tx=Math.floor(Math.random()*(map[0].length-2))+1;
+  let ty=Math.floor(Math.random()*(map.length-2))+1;
+  if(map[ty][tx]===0) coins.push({x:tx*tile,y:ty*tile});
+ }
+
+ uiLife.textContent=life;
+ uiLevel.textContent=level;
+ uiCoin.textContent=coin;
+}
+
+startMap();
+
+function wall(x,y){
+ let tx=Math.floor(x/tile);
+ let ty=Math.floor(y/tile);
+ return map[ty][tx]===1;
+}
+
+function hitTrap(){
+ life--;
+ uiLife.textContent=life;
+ player.x=48; player.y=48;
+ if(life<=0){
+  alert("💀 Game Over");
+  location.reload();
+ }
+}
+
+function update(){
+ // player move
+ let nx=player.x, ny=player.y;
+ if(keys.ArrowUp) ny-=player.speed;
+ if(keys.ArrowDown) ny+=player.speed;
+ if(keys.ArrowLeft) nx-=player.speed;
+ if(keys.ArrowRight) nx+=player.speed;
+ if(!wall(nx,player.y)) player.x=nx;
+ if(!wall(player.x,ny)) player.y=ny;
+
+ // enemy
+ enemy.y += enemy.vy;
+ if(wall(enemy.x,enemy.y)) enemy.vy*=-1;
+
+ // enemy touch player
+ if(Math.hypot(player.x-enemy.x,player.y-enemy.y)<24) hitTrap();
+
+ // tuzoqlar
+ traps.forEach(t=>{
+  if(Math.hypot(player.x-t.x,player.y-t.y)<16) hitTrap();
+ });
+
+ // coin
+ coins.forEach((c,i)=>{
+  if(Math.hypot(player.x-c.x,player.y-c.y)<16){
+   coin++; coins.splice(i,1);
+   uiCoin.textContent=coin;
+  }
+ });
+
+ // level finish
+ let tx=Math.floor(player.x/tile);
+ let ty=Math.floor(player.y/tile);
+ if(map[ty][tx]===2){
+  level++;
+  if(level>levels.length){
+   alert("🏆 YUTDING!");
+   location.reload();
+  }
+  startMap();
+ }
+}
+
+function draw(){
+ ctx.clearRect(0,0,c.width,c.height);
+
+ for(let y=0;y<map.length;y++){
+  for(let x=0;x<map[y].length;x++){
+   if(map[y][x]==1){ctx.fillStyle="#475569"; ctx.fillRect(x*tile,y*tile,tile,tile);}
+   if(map[y][x]==2){ctx.fillStyle="#22c55e"; ctx.fillRect(x*tile,y*tile,tile,tile);}
+  }
+ }
+
+ traps.forEach(t=>{ctx.fillStyle="orange"; ctx.fillRect(t.x,t.y,tile,tile);});
+ coins.forEach(c=>{ctx.fillStyle="yellow"; ctx.fillRect(c.x,c.y,tile,tile);});
+
+ ctx.fillStyle="red";
+ ctx.beginPath(); ctx.arc(enemy.x,enemy.y,12,0,Math.PI*2); ctx.fill();
+
+ ctx.fillStyle="#2563eb";
+ ctx.beginPath(); ctx.arc(player.x,player.y,12,0,Math.PI*2); ctx.fill();
+}
+
+function loop(){ update(); draw(); requestAnimationFrame(loop); }
+loop();
+
+// MOBILE TOUCH
+["up","down","left","right"].forEach(d=>{
+ const m={up:"ArrowUp",down:"ArrowDown",left:"ArrowLeft",right:"ArrowRight"};
+ let b=document.getElementById(d);
+ b.ontouchstart=()=>keys[m[d]]=true;
+ b.ontouchend=()=>keys[m[d]]=false;
+ b.onmousedown=()=>keys[m[d]]=true;
+ b.onmouseup=()=>keys[m[d]]=false;
+});
+</script>
+</body>
+</html>

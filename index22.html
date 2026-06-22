@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ball Sort Master - Responsive</title>
+    <style>
+        :root {
+            --bg-color: #1a1a2e;
+            --tube-border: #4e61d3;
+            --exit-bg: #e74c3c;
+            --reset-bg: #580C82;
+        }
+        * { box-sizing: border-box; touch-action: manipulation; }
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            display: flex; flex-direction: column; align-items: center; 
+            background: var(--bg-color); color: white; margin: 0; padding: 10px;
+            min-height: 100vh; overflow-x: hidden;
+        }
+        .header { text-align: center; margin-bottom: 10px; width: 100%; }
+        h1 { font-size: 24px; margin: 10px 0; }
+        .level-info { font-size: 22px; color: #f4f754; font-weight: bold; }
+        
+        .game-container { 
+            display: flex; gap: 10px; flex-wrap: wrap; 
+            justify-content: center; width: 100%; max-width: 500px; 
+            padding: 10px; margin: auto;
+        }
+        
+        /* Mobil uchun kolba o'lchamlari */
+        .tube { 
+            width: 45px; height: 150px; border: 3px solid var(--tube-border); 
+            border-radius: 0 0 25px 25px; display: flex; 
+            flex-direction: column-reverse; align-items: center; 
+            padding-bottom: 5px; cursor: pointer; position: relative; 
+            transition: 0.2s; background: rgba(255,255,255,0.05);
+        }
+        .tube.selected { border-color: #01ff1f; transform: translateY(-15px); box-shadow: 0 5px 15px rgba(1,255,31,0.4); }
+        
+        .ball { 
+            width: 36px; height: 36px; border-radius: 50%; margin: 1px 0; 
+            box-shadow: inset -3px -3px 6px rgba(0,0,0,0.4), inset 3px 3px 6px rgba(255,255,255,0.4);
+        }
+        
+        .controls { 
+            margin-top: 20px; display: flex; gap: 15px; 
+            width: 100%; justify-content: center; padding-bottom: 20px;
+        }
+        button { 
+            padding: 10px 20px; font-size: 14px; cursor: pointer; border-radius: 20px; 
+            border: none; color: white; font-weight: bold; transition: 0.2s;
+        }
+        .btn-reset { background: var(--reset-bg); }
+        .btn-exit { background: var(--exit-bg); }
+
+        /* Katta ekranlar (Planshet va PC) uchun */
+        @media (min-width: 600px) {
+            .tube { width: 55px; height: 180px; }
+            .ball { width: 44px; height: 44px; }
+            h1 { font-size: 32px; }
+            button { padding: 12px 30px; font-size: 16px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Ball Sort Master</h1>
+        <div class="level-info" id="level-display">Level: 1</div>
+    </div>
+
+    <div class="game-container" id="game-container"></div>
+
+    <div class="controls">
+        <button class="btn-exit" onclick="exitGame()">Exit</button>
+        <button class="btn-reset" onclick="restartLevel()">Reset</button>
+    </div>
+
+    <script>
+        const ALL_COLORS = ['#FF3F7F', '#01FF1F', '#0078FF', '#F4F754', '#BD00FF', '#FF9A00', '#00D1FF', '#FF0000', '#46B3A5', '#E6E0DA'];
+        const TUBE_CAPACITY = 4;
+        let currentLevel = 1;
+        let tubes = [];
+        let selectedTubeIndex = null;
+
+        function initLevel(level) {
+            const numColors = Math.min(2 + Math.floor(level/1.5), 10); 
+            const activeColors = ALL_COLORS.slice(0, numColors);
+            const numEmptyTubes = 2;
+            let balls = [];
+            activeColors.forEach(color => { for (let i = 0; i < TUBE_CAPACITY; i++) balls.push(color); });
+            balls.sort(() => Math.random() - 0.5);
+
+            tubes = [];
+            for (let i = 0; i < numColors; i++) tubes.push(balls.splice(0, TUBE_CAPACITY));
+            for (let i = 0; i < numEmptyTubes; i++) tubes.push([]);
+
+            document.getElementById('level-display').innerText = `Level: ${level}`;
+            selectedTubeIndex = null;
+            render();
+        }
+
+        function render() {
+            const container = document.getElementById('game-container');
+            container.innerHTML = '';
+            tubes.forEach((tube, index) => {
+                const tubeDiv = document.createElement('div');
+                tubeDiv.className = `tube ${selectedTubeIndex === index ? 'selected' : ''}`;
+                tubeDiv.onclick = () => handleTubeClick(index);
+                tube.forEach(color => {
+                    const ballDiv = document.createElement('div');
+                    ballDiv.className = 'ball';
+                    ballDiv.style.backgroundColor = color;
+                    tubeDiv.appendChild(ballDiv);
+                });
+                container.appendChild(tubeDiv);
+            });
+        }
+
+        function handleTubeClick(index) {
+            if (selectedTubeIndex === null) {
+                if (tubes[index].length > 0) selectedTubeIndex = index;
+            } else {
+                if (canMove(selectedTubeIndex, index)) {
+                    moveBall(selectedTubeIndex, index);
+                    selectedTubeIndex = null;
+                    if (checkWin()) {
+                        setTimeout(() => {
+                            alert(`G'alaba! ${currentLevel}-bosqich tugadi.`);
+                            currentLevel++;
+                            initLevel(currentLevel);
+                        }, 300);
+                    }
+                } else {
+                    selectedTubeIndex = (tubes[index].length > 0) ? index : null;
+                }
+            }
+            render();
+        }
+
+        function canMove(from, to) {
+            if (from === to) return false;
+            const ballToMove = tubes[from][tubes[from].length - 1];
+            const targetTube = tubes[to];
+            if (targetTube.length >= TUBE_CAPACITY) return false;
+            return targetTube.length === 0 || targetTube[targetTube.length - 1] === ballToMove;
+        }
+
+        function moveBall(from, to) { tubes[to].push(tubes[from].pop()); }
+
+        function checkWin() {
+            return tubes.every(tube => {
+                if (tube.length === 0) return true;
+                return tube.length === TUBE_CAPACITY && tube.every(v => v === tube[0]);
+            });
+        }
+
+        function restartLevel() { initLevel(currentLevel); }
+        function exitGame() { if(confirm("Chiqmoqchimisiz?")) window.location.href = "index2.html"; }
+
+        initLevel(currentLevel);
+    </script>
+</body>
+</html>

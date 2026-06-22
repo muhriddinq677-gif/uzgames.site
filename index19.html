@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Jewel Puzzle </title>
+    <style>
+        :root { --accent: #00fff2; --cell: clamp(32px, 11vw, 46px); }
+        * { box-sizing: border-box; touch-action: none; user-select: none; margin: 0; padding: 0; }
+        body { color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; background: #000; }
+        
+        #menu { position: fixed; inset: 0; background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; gap: 20px; }
+        .menu-title { font-size: 40px; font-weight: 900; color: var(--accent); text-shadow: 0 0 20px var(--accent); margin-bottom: 20px; }
+        .menu-btn { padding: 18px 40px; width: 280px; background: rgba(0,0,0,0.8); color: var(--accent); border: 2px solid var(--accent); border-radius: 15px; font-weight: 800; cursor: pointer; font-size: 16px; text-transform: uppercase; box-shadow: 0 0 15px rgba(0,255,242,0.3); }
+
+        .game-ui { display: none; flex-direction: column; align-items: center; width: 100%; position: relative; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; width: 95vw; max-width: 400px; margin-bottom: 10px; }
+        .exit-btn { padding: 8px 15px; background: #ff0055; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        
+        .stats { display: flex; justify-content: space-between; width: 95vw; max-width: 400px; padding: 12px; background: rgba(0,0,0,0.7); border-radius: 12px; border: 1px solid var(--accent); margin-bottom: 10px; }
+        .stat-val { font-size: 18px; font-weight: 900; color: var(--accent); }
+
+        #board { display: grid; grid-template-columns: repeat(8, var(--cell)); grid-template-rows: repeat(8, var(--cell)); gap: 4px; background: rgba(255,255,255,0.1); padding: 8px; border-radius: 10px; border: 2px solid #2d0066; }
+        .cell { width: var(--cell); height: var(--cell); background: rgba(0,0,0,0.5); border-radius: 4px; }
+        .filled { border: 1px solid rgba(255,255,255,0.4); box-shadow: inset 0 0 10px rgba(0,0,0,0.5); }
+        .preview { background: rgba(0,255,242,0.3) !important; border: 1px solid var(--accent); }
+        
+        #tray { margin-top: 25px; display: flex; gap: 15px; height: 110px; align-items: center; justify-content: center; }
+        .piece { cursor: grab; display: grid; gap: 2px; transform: scale(0.55); transform-origin: center; }
+        .piece.dragging { transform: scale(1.0); opacity: 0.8; z-index: 2000; }
+        .p-cell { width: var(--cell); height: var(--cell); border-radius: 5px; }
+
+        #game-over { position: fixed; inset: 0; background: rgba(0,0,0,0.98); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1100; gap: 15px; }
+        .btn-common { padding: 15px 35px; border-radius: 12px; border: none; font-weight: 900; cursor: pointer; width: 250px; text-transform: uppercase; }
+        .btn-restart { background: var(--accent); color: #000; }
+        .btn-home { background: #ff0055; color: white; }
+        .btn-next { background: #00ff66; color: #000; display: none; }
+    </style>
+</head>
+<body>
+
+<div id="menu">
+    <h1 class="menu-title">JEWEL PUZZLE</h1>
+    <button class="menu-btn" onclick="initGame('100-score')">100 Ballik Rejim</button>
+    <button class="menu-btn" onclick="initLevelMode()">Bosqichli Rejim</button>
+    <button class="menu-btn" onclick="initGame('classic')">Klassik Rejim</button>
+</div>
+
+<div id="game-ui" class="game-ui">
+    <div class="top-bar">
+        <div id="level-display" class="stat-val" style="visibility: hidden;">BOSQICH: <span id="lv-num">1</span></div>
+        <button class="exit-btn" onclick="location.reload()">EXIT</button>
+    </div>
+    <div class="stats">
+        <div><span id="label-stat" class="stat-val">BALL</span>: <span id="val-stat" class="stat-val">0</span></div>
+        <div><span class="stat-val">VAQT: <span id="timer">0</span>s</span></div>
+    </div>
+    <div id="board"></div>
+    <div id="tray"></div>
+</div>
+
+<div id="game-over" style="display: none;">
+    <h1 id="status-title" style="font-size: 30px; text-align: center;"></h1>
+    <p id="final-info" style="margin: 10px 0; font-size: 18px; color: #ccc; text-align: center;"></p>
+    <button id="btn-continue" class="btn-common btn-next" onclick="nextLevel()">Davom Etish</button>
+    <button class="btn-common btn-restart" onclick="restartMode()">Qayta Boshlash</button>
+    <button class="btn-common btn-home" onclick="location.reload()">Asosiy Menyu</button>
+</div>
+
+<script>
+let score = 0, grid = [], mode = '', time = 0, timerInt = null;
+let lvReq = 20, lvTime = 60, currentLv = 1, blocksUsed = 0, trayItems = [];
+let dragData = { shape: null, index: null, element: null };
+
+const SHAPES = [
+    { s: [[1,1],[1,1]], c: '#ff0055' }, // Kvadrat
+    { s: [[1,1,1,1]], c: '#00fff2' },    // Goriz 4
+    { s: [[1],[1],[1],[1]], c: '#00ff66' }, // Vert 4
+    { s: [[1]], c: '#ffcc00' },          // Nuqta
+    { s: [[1,0],[1,0],[1,1]], c: '#cc00ff' }, // L-shakl
+    { s: [[1,1,1]], c: '#ff6600' }       // 3-tayoq
+];
+
+function initLevelMode() { currentLv = 1; lvReq = 20; lvTime = 60; initGame('levels'); }
+
+function initGame(m) {
+    mode = m; score = 0; blocksUsed = 0;
+    time = (m === 'levels') ? lvTime : 0;
+    grid = Array(8).fill().map(() => Array(8).fill(0));
+    document.getElementById('menu').style.display = 'none';
+    document.getElementById('game-over').style.display = 'none';
+    document.getElementById('game-ui').style.display = 'flex';
+    document.getElementById('btn-continue').style.display = 'none';
+    
+    const lvDisp = document.getElementById('level-display');
+    if(m === 'levels') { lvDisp.style.visibility = 'visible'; document.getElementById('lv-num').innerText = currentLv; }
+    else { lvDisp.style.visibility = 'hidden'; }
+
+    updateUI(); drawBoard(); spawnPieces(); startTimer();
+}
+
+function startTimer() {
+    clearInterval(timerInt);
+    timerInt = setInterval(() => {
+        if(mode === 'levels') { time--; if(time <= 0) endGame("VAQT TUGADI - YENGILDINGIZ!", false); }
+        else time++;
+        document.getElementById('timer').innerText = time;
+    }, 1000);
+}
+
+function drawBoard() {
+    const b = document.getElementById('board'); b.innerHTML = '';
+    for(let i=0; i<64; i++){
+        const c = document.createElement('div'); c.className = 'cell';
+        c.dataset.r = Math.floor(i/8); c.dataset.c = i%8;
+        c.ondragover = (e) => { e.preventDefault(); showPreview(parseInt(c.dataset.r), parseInt(c.dataset.c)); };
+        c.ondrop = () => handleDrop(parseInt(c.dataset.r), parseInt(c.dataset.c));
+        b.appendChild(c);
+    }
+}
+
+function spawnPieces() {
+    const t = document.getElementById('tray'); t.innerHTML = ''; trayItems = [];
+    for(let i=0; i<3; i++) {
+        let itm = SHAPES[Math.floor(Math.random() * SHAPES.length)]; trayItems.push(itm);
+        let p = document.createElement('div'); p.className = 'piece'; p.draggable = true;
+        p.style.gridTemplateColumns = `repeat(${itm.s[0].length}, var(--cell))`;
+        itm.s.forEach(row => row.forEach(v => {
+            let d = document.createElement('div'); d.className = 'p-cell';
+            if(v) { d.style.background = itm.c; d.style.boxShadow = `inset 0 0 10px rgba(255,255,255,0.3)`; }
+            p.appendChild(d);
+        }));
+        p.ondragstart = () => { dragData = { shape: itm, index: i, element: p }; p.classList.add('dragging'); };
+        p.ondragend = () => { p.classList.remove('dragging'); clearPreview(); };
+        t.appendChild(p);
+    }
+    checkStatus();
+}
+
+function handleDrop(r, c) {
+    if(!dragData.shape) return;
+    let s = dragData.shape.s;
+    if(canPlace(s, r, c)) {
+        s.forEach((row, i) => row.forEach((v, j) => {
+            if(v) {
+                grid[r+i][c+j] = dragData.shape.c;
+                let cell = board.children[(r+i)*8 + (c+j)];
+                cell.classList.add('filled'); cell.style.background = dragData.shape.c;
+            }
+        }));
+        dragData.element.remove(); trayItems[dragData.index] = null; blocksUsed++;
+        clearLines(); updateUI();
+        if(!checkWin()){ if(trayItems.every(p => p === null)) spawnPieces(); else checkStatus(); }
+    }
+}
+
+function canPlace(s, r, c) {
+    for(let i=0; i<s.length; i++) for(let j=0; j<s[i].length; j++)
+        if(s[i][j] && (r+i >= 8 || c+j >= 8 || grid[r+i][c+j])) return false;
+    return true;
+}
+
+function clearLines() {
+    let rl = [], cl = [];
+    for(let i=0; i<8; i++){
+        if(grid[i].every(x => x !== 0)) rl.push(i);
+        let col = []; for(let row=0; row<8; row++) col.push(grid[row][i]);
+        if(col.every(x => x !== 0)) cl.push(i);
+    }
+    rl.forEach(r => { grid[r] = Array(8).fill(0); score += 10; });
+    cl.forEach(c => { 
+        for(let r=0; r<8; r++) grid[r][c] = 0; 
+        score += 10;
+    });
+    const board = document.getElementById('board');
+    for(let r=0; r<8; r++) for(let c=0; c<8; c++) {
+        let cell = board.children[r*8+c];
+        if(grid[r][c] === 0) { cell.classList.remove('filled'); cell.style.background = ''; }
+    }
+}
+
+function updateUI() {
+    let v = document.getElementById('val-stat'), l = document.getElementById('label-stat');
+    if(mode === 'levels') { l.innerText = "QOLDI"; v.innerText = (lvReq - blocksUsed); }
+    else { l.innerText = "BALL"; v.innerText = score; }
+}
+
+function checkWin() {
+    if(mode === '100-score' && score >= 100) { endGame("SIZNING RECORDINGIZ: " + (time) + "s", true); return true; }
+    if(mode === 'levels' && blocksUsed >= lvReq) { 
+        if(currentLv < 10) { document.getElementById('btn-continue').style.display = 'block'; endGame("BOSQICH YUTILDI!", true); }
+        else endGame("TABRIKLAYMIZ! HAMMA BOSQICHLAR TUGADI!", true);
+        return true; 
+    }
+    return false;
+}
+
+function checkStatus() {
+    let possible = trayItems.some(p => {
+        if(!p) return false;
+        for(let r=0; r<8; r++) for(let c=0; c<8; c++) if(canPlace(p.s, r, c)) return true;
+        return false;
+    });
+    if(!possible && !trayItems.every(p => p === null)) endGame("JOY QOLMADI - YENGILDINGIZ!", false);
+}
+
+function endGame(m, win) {
+    clearInterval(timerInt);
+    document.getElementById('game-over').style.display = 'flex';
+    document.getElementById('status-title').innerText = m;
+    document.getElementById('status-title').style.color = win ? "#00fff2" : "#ff0055";
+    document.getElementById('final-info').innerText = (mode==='levels'?"Bosqich: "+currentLv:"Ball: "+score);
+}
+
+function nextLevel() { currentLv++; lvReq += 5; lvTime += 5; initGame('levels'); }
+function restartMode() { initGame(mode); }
+function showPreview(r, c) {
+    clearPreview();
+    if(!dragData.shape) return;
+    let s = dragData.shape.s;
+    if(canPlace(s, r, c)) s.forEach((row, i) => row.forEach((v, j) => {
+        if(v) document.getElementById('board').children[(r+i)*8 + c + j].classList.add('preview');
+    }));
+}
+function clearPreview() { document.querySelectorAll('.preview').forEach(e => e.classList.remove('preview')); }
+</script>
+<script src="script.js"></script>
+</body>
+</html>

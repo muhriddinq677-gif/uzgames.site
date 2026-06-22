@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>2048 Triple </title>
+    <style>
+        :root { --bg: #0f172a; --card: #1e293b; --accent: #00f2ff; --text: #f8fafc; }
+        body { 
+            background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif;
+            margin: 0; height: 100vh; overflow: hidden; display: flex; 
+            justify-content: center; align-items: center; touch-action: none; user-select: none;
+        }
+        /* --- MENU --- */
+        #menu, #record-setup { display: flex; flex-direction: column; align-items: center; gap: 20px; text-align: center; }
+        #record-setup { display: none; }
+        h1 { font-size: 60px; margin: 0; color: var(--accent); text-shadow: 0 0 15px var(--accent); }
+        .btn-group { display: flex; flex-direction: column; gap: 15px; width: 250px; }
+        .btn { 
+            background: var(--card); border: 2px solid var(--accent); color: white; 
+            padding: 15px; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer;
+            transition: 0.2s;
+        }
+        .btn:active { transform: scale(0.95); }
+        input {
+            padding: 15px; border-radius: 10px; border: 2px solid var(--accent);
+            background: var(--bg); color: white; text-align: center; font-size: 18px; width: 100%; box-sizing: border-box;
+        }
+
+        /* --- GAME SCREEN --- */
+        #game-screen { display: none; flex-direction: column; align-items: center; width: 100%; }
+        .header { width: 90vw; max-width: 400px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .stat-box { background: var(--card); padding: 8px; border-radius: 8px; min-width: 90px; text-align: center; }
+        .label { font-size: 10px; color: var(--accent); text-transform: uppercase; }
+        .val { font-size: 20px; font-weight: bold; }
+        .exit-btn { background: #f43f5e; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+
+        #board { 
+            background: var(--card); padding: 10px; border-radius: 15px;
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+            width: 85vw; height: 85vw; max-width: 380px; max-height: 380px; position: relative;
+        }
+        .tile { 
+            background: #334155; border-radius: 8px; display: flex; 
+            justify-content: center; align-items: center; font-size: 24px; font-weight: 900; 
+        }
+        .n2 { background: #6366f1; } .n4 { background: #a855f7; } .n8 { background: #ec4899; }
+        .n16 { background: #f43f5e; } .n32 { background: #f97316; } .n64 { background: #22c55e; }
+        .n128 { background: #06b6d4; } .n256 { background: #3b82f6; } .n2048 { background: #eab308; color: #000; }
+
+        #overlay { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.95); display: none;
+            flex-direction: column; justify-content: center; align-items: center; border-radius: 15px; z-index: 100;
+        }
+    </style>
+</head>
+<body>
+<button 
+    onclick="window.location.href='index.html'"
+    style="
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: clamp(8px, 2vw, 12px) clamp(15px, 4vw, 25px);
+        font-size: clamp(14px, 2.5vw, 18px);
+        background-color: #ff4757;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-family: sans-serif;
+        font-weight: 600;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        transition: all 0.3s ease;
+        z-index: 9999;
+    "
+    onmouseover="this.style.backgroundColor='#ff6b81'; this.style.transform='scale(1.05)';"
+    onmouseout="this.style.backgroundColor='#ff4757'; this.style.transform='scale(1)';"
+>
+    Chiqish
+</button>
+
+    <!-- Bosh Menu -->
+    <div id="menu">
+   
+        <h1>2048 </h1>
+        <div class="btn-group">
+            <button class="btn" onclick="start('normal')">ODDIY</button>
+            <button class="btn" onclick="openRecordSetup()">RECORD</button>
+        </div>
+        <p style="opacity: 0.6;">Rekord: <b id="menu-record">2</b></p>
+    </div>
+
+    <!-- Record Sozlamalari (Vaqt kiritish) -->
+    <div id="record-setup">
+        <h2>Vaqtni kiriting (soniya)</h2>
+        <div class="btn-group">
+            <input type="number" id="time-input" placeholder="Masalan: 60" value="60">
+            <button class="btn" onclick="start('record')">BOSHLASH</button>
+            <button class="btn" onclick="goHome()" style="border-color: #fff;">ORQAGA</button>
+        </div>
+    </div>
+
+    <!-- O'yin Ekran -->
+    <div id="game-screen">
+        <div class="header">
+            <button class="exit-btn" onclick="goHome()">EXIT</button>
+            <div id="timer-box" class="stat-box"><div class="label">Vaqt</div><div id="timer" class="val">∞</div></div>
+            <div id="record-box" class="stat-box"><div class="label">Record</div><div id="best-tile" class="val">2</div></div>
+        </div>
+
+        <div id="board">
+            <div id="overlay">
+                <h2 id="msg">Tamom!</h2>
+                <div class="btn-group" style="width:180px">
+                    <button class="btn" onclick="resetGame()">QAYTA</button>
+                    <button class="btn" onclick="goHome()" style="border-color:#fff;">MENU</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    let grid = [], mode = '', timeLeft = 0, timerInt = null, sX, sY;
+    let best = localStorage.getItem('2048_triple_best') || 2;
+    document.getElementById('menu-record').innerText = best;
+
+    function openRecordSetup() {
+        document.getElementById('menu').style.display = 'none';
+        document.getElementById('record-setup').style.display = 'flex';
+    }
+
+    function goHome() {
+        clearInterval(timerInt);
+        document.getElementById('game-screen').style.display = 'none';
+        document.getElementById('record-setup').style.display = 'none';
+        document.getElementById('menu').style.display = 'flex';
+        document.getElementById('menu-record').innerText = best;
+    }
+
+    function start(m) {
+        mode = m;
+        if (m === 'record') {
+            let val = parseInt(document.getElementById('time-input').value);
+            if (isNaN(val) || val <= 0) { alert("To'g'ri vaqt kiriting!"); return; }
+            timeLeft = val;
+        }
+        document.getElementById('menu').style.display = 'none';
+        document.getElementById('record-setup').style.display = 'none';
+        document.getElementById('game-screen').style.display = 'flex';
+        document.getElementById('timer-box').style.display = (m === 'record') ? 'block' : 'none';
+        document.getElementById('record-box').style.display = (m === 'record') ? 'block' : 'none';
+        resetGame();
+    }
+
+    function resetGame() {
+        grid = Array(16).fill(0);
+        document.getElementById('overlay').style.display = 'none';
+        clearInterval(timerInt);
+        if (mode === 'record') {
+            document.getElementById('best-tile').innerText = best;
+            startTimer();
+        }
+        addTile(); addTile(); render();
+    }
+
+    function startTimer() {
+        timerInt = setInterval(() => {
+            timeLeft--;
+            let m = Math.floor(timeLeft / 60), s = timeLeft % 60;
+            document.getElementById('timer').innerText = timeLeft > 60 ? `${m}:${s<10?'0'+s:s}` : timeLeft + "s";
+            if (timeLeft <= 0) endGame("Vaqt tugadi!");
+        }, 1000);
+    }
+
+    function addTile() {
+        let empty = grid.map((v, i) => v === 0 ? i : null).filter(v => v !== null);
+        if (empty.length) grid[empty[Math.floor(Math.random() * empty.length)]] = Math.random() < 0.9 ? 2 : 4;
+    }
+
+    function render() {
+        const board = document.getElementById('board');
+        board.querySelectorAll('.tile').forEach(t => t.remove());
+        grid.forEach(v => {
+            let d = document.createElement('div');
+            d.className = 'tile' + (v ? ' n' + v : '');
+            d.innerText = v || '';
+            board.appendChild(d);
+        });
+        if (mode === 'record') {
+            let max = Math.max(...grid);
+            if (max > best) { best = max; localStorage.setItem('2048_triple_best', best); document.getElementById('best-tile').innerText = best; }
+        }
+    }
+
+    function slideTriple(row) {
+        let arr = row.filter(v => v), res = [];
+        for (let i = 0; i < arr.length; i++) {
+            if (i < arr.length - 2 && arr[i] === arr[i+1] && arr[i] === arr[i+2]) {
+                res.push(arr[i] * 4); // 3-talik birlashish (2+2+2 = 8)
+                i += 2;
+            } else if (i < arr.length - 1 && arr[i] === arr[i+1]) {
+                res.push(arr[i] * 2);
+                i += 1;
+            } else { res.push(arr[i]); }
+        }
+        while (res.length < 4) res.push(0);
+        return res;
+    }
+
+    function move(dir) {
+        if (document.getElementById('overlay').style.display === 'flex') return;
+        let old = JSON.stringify(grid);
+        for (let i = 0; i < 4; i++) {
+            let row = (dir == 'L' || dir == 'R') ? grid.slice(i * 4, i * 4 + 4) : [grid[i], grid[i+4], grid[i+8], grid[i+12]];
+            if (dir == 'R' || dir == 'D') row.reverse();
+            let res = slideTriple(row);
+            if (dir == 'R' || dir == 'D') res.reverse();
+            if (dir == 'L' || dir == 'R') grid.splice(i * 4, 4, ...res);
+            else for (let j = 0; j < 4; j++) grid[i + j * 4] = res[j];
+        }
+        if (old !== JSON.stringify(grid)) { addTile(); render(); checkStatus(); }
+    }
+
+    function checkStatus() {
+        if (Math.max(...grid) >= 2048) endGame("G'alaba!");
+        else if (!grid.includes(0)) {
+            let can = false;
+            for (let i = 0; i < 16; i++) {
+                if (i % 4 < 3 && grid[i] === grid[i + 1]) can = true;
+                if (i < 12 && grid[i] === grid[i + 4]) can = true;
+            }
+            if (!can) endGame("Joy qolmadi!");
+        }
+    }
+
+    function endGame(m) { clearInterval(timerInt); document.getElementById('msg').innerText = m; document.getElementById('overlay').style.display = 'flex'; }
+
+    // INPUT
+    const ts = (x, y) => { sX = x; sY = y; };
+    const te = (x, y) => {
+        let dx = x - sX, dy = y - sY;
+        if (Math.max(Math.abs(dx), Math.abs(dy)) > 30) {
+            if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 'R' : 'L');
+            else move(dy > 0 ? 'D' : 'U');
+        }
+    };
+    document.addEventListener('touchstart', e => ts(e.touches.clientX, e.touches.clientY));
+    document.addEventListener('touchend', e => te(e.changedTouches.clientX, e.changedTouches.clientY));
+    document.addEventListener('mousedown', e => ts(e.clientX, e.clientY));
+    document.addEventListener('mouseup', e => te(e.clientX, e.clientY));
+    window.onkeydown = e => { if (e.key.includes("Left")) move('L'); if (e.key.includes("Right")) move('R'); if (e.key.includes("Up")) move('U'); if (e.key.includes("Down")) move('D'); };
+</script>
+</body>
+</html>

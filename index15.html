@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Multiplayer Battle Pong</title>
+    <style>
+        :root { --p1: #00FF00; --p2: #3498db; --p3: #f1c40f; --p4: #FF3E3E; }
+        body { margin: 0; background: #111; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; touch-action: none; }
+        #menu { position: absolute; background: rgba(20,20,20,0.95); padding: 20px; border-radius: 15px; text-align: center; border: 2px solid var(--p1); z-index: 100; width: 90%; max-width: 400px; }
+        canvas { background: #000; box-shadow: 0 0 20px rgba(255,255,255,0.1); max-width: 95vw; max-height: 50vh; border: 2px solid #333; }
+        .controls-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 95%; margin-top: 10px; }
+        .p-btn-group { display: flex; flex-direction: column; align-items: center; border: 1px solid #444; padding: 5px; border-radius: 8px; }
+        .btn { 
+    width: 60px; 
+    height: 50px; 
+    margin: 2px; 
+    background: #333; 
+    color: white; 
+    border: none; 
+    border-radius: 5px; 
+    font-weight: bold; 
+    font-size: 18px; 
+    
+    -webkit-user-select: none; 
+    -moz-user-select: none;   
+    -ms-user-select: none;   
+    user-select: none;         
+}
+
+        .btn:active { background: #555; transform: scale(0.95); }
+        .hud { display: flex; width: 95%; justify-content: space-around; font-size: 14px; margin-bottom: 5px; font-weight: bold; flex-wrap: wrap; }
+        select, button#start-btn { padding: 10px; margin: 5px; width: 80%; border-radius: 5px; font-size: 16px; }
+        #start-btn { background: var(--p1); color: #000; border: none; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div id="menu">
+    <h2 style="color:var(--p1)">BATTLE PONG</h2>
+    <label>O'yinchilar soni:</label><br>
+    <select id="pCount">
+        <option value="1">1 O'yinchi (Siz vs 3 Bot)</option>
+        <option value="2">2 O'yinchi (+ 2 Bot)</option>
+        <option value="3">3 O'yinchi (+ 1 Bot)</option>
+        <option value="4">4 O'yinchi (Real Battle)</option>
+    </select><br>
+    <label>Vaqt (minut):</label><br>
+    <select id="gTime">
+        <option value="60">1 Minut</option>
+        <option value="120">2 Minut</option>
+    </select><br>
+    <button id="start-btn" onclick="init()">O'YINNI BOSHLASH</button>
+</div>
+
+<div class="hud" id="hud" style="display:none">
+    <div style="color:var(--p1)">P1: <span id="s1">0</span></div>
+    <div style="color:var(--p2)">P2: <span id="s2">0</span></div>
+    <div id="timer" style="color:white; background: red; padding: 0 10px; border-radius: 5px;">01:00</div>
+    <div style="color:var(--p3)">P3: <span id="s3">0</span></div>
+    <div style="color:var(--p4)">P4: <span id="s4">0</span></div>
+</div>
+
+<canvas id="game"></canvas>
+
+<div class="controls-grid" id="controls" style="display:none">
+    <div class="p-btn-group" style="border-color:var(--p1)">
+        <span>P1 (WS)</span>
+        <div><button class="btn" onmousedown="keys['KeyW']=true" onmouseup="keys['KeyW']=false" ontouchstart="keys['KeyW']=true" ontouchend="keys['KeyW']=false">W</button>
+        <button class="btn" onmousedown="keys['KeyS']=true" onmouseup="keys['KeyS']=false" ontouchstart="keys['KeyS']=true" ontouchend="keys['KeyS']=false">S</button></div>
+    </div>
+    <div class="p-btn-group" style="border-color:var(--p2)">
+        <span>P2 (TG)</span>
+        <div><button class="btn" onmousedown="keys['KeyT']=true" onmouseup="keys['KeyT']=false" ontouchstart="keys['KeyT']=true" ontouchend="keys['KeyT']=false">T</button>
+        <button class="btn" onmousedown="keys['KeyG']=true" onmouseup="keys['KeyG']=false" ontouchstart="keys['KeyG']=true" ontouchend="keys['KeyG']=false">G</button></div>
+    </div>
+    <div class="p-btn-group" style="border-color:var(--p3)">
+        <span>P3 (KL)</span>
+        <div><button class="btn" onmousedown="keys['KeyK']=true" onmouseup="keys['KeyK']=false" ontouchstart="keys['KeyK']=true" ontouchend="keys['KeyK']=false">K</button>
+        <button class="btn" onmousedown="keys['KeyL']=true" onmouseup="keys['KeyL']=false" ontouchstart="keys['KeyL']=true" ontouchend="keys['KeyL']=false">L</button></div>
+    </div>
+    <div class="p-btn-group" style="border-color:var(--p4)">
+        <span>P4 (Arrows)</span>
+        <div><button class="btn" onmousedown="keys['ArrowLeft']=true" onmouseup="keys['ArrowLeft']=false" ontouchstart="keys['ArrowLeft']=true" ontouchend="keys['ArrowLeft']=false">←</button>
+        <button class="btn" onmousedown="keys['ArrowRight']=true" onmouseup="keys['ArrowRight']=false" ontouchstart="keys['ArrowRight']=true" ontouchend="keys['ArrowRight']=false">→</button></div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    let ball, players = [], loop, timerInt, timeLeft, realPlayers;
+    let keys = {};
+
+    window.onkeydown = e => keys[e.code] = true;
+    window.onkeyup = e => keys[e.code] = false;
+
+    function init() {
+        realPlayers = parseInt(document.getElementById("pCount").value);
+        timeLeft = parseInt(document.getElementById("gTime").value);
+        document.getElementById("menu").style.display = "none";
+        document.getElementById("hud").style.display = "flex";
+        document.getElementById("controls").style.display = "grid";
+        
+        canvas.width = 600; canvas.height = 600;
+
+        players = [
+            { x: 10, y: 250, w: 10, h: 100, s: 0, c: '#00FF00', up: 'KeyW', down: 'KeyS', ax: 'y', isBot: false },
+            { x: 580, y: 250, w: 10, h: 100, s: 0, c: '#3498db', up: 'KeyT', down: 'KeyG', ax: 'y', isBot: realPlayers < 2 },
+            { x: 250, y: 10, w: 100, h: 10, s: 0, c: '#f1c40f', up: 'KeyK', down: 'KeyL', ax: 'x', isBot: realPlayers < 3 },
+            { x: 250, y: 580, w: 100, h: 10, s: 0, c: '#FF3E3E', up: 'ArrowLeft', down: 'ArrowRight', ax: 'x', isBot: realPlayers < 4 }
+        ];
+
+        resetBall();
+        loop = setInterval(update, 1000/60);
+        timerInt = setInterval(() => {
+            timeLeft--;
+            let m = Math.floor(timeLeft/60), s = timeLeft%60;
+            document.getElementById("timer").innerText = `${m}:${s<10?'0':''}${s}`;
+            if(timeLeft <= 0) endGame();
+        }, 1000);
+    }
+
+    function resetBall() {
+        ball = { x: 300, y: 300, r: 7, dx: (Math.random()>0.5?2:-2), dy: (Math.random()>0.5?2:-2) };
+    }
+
+    function update() {
+        players.forEach((p, i) => {
+            if(p.isBot) { // Bot mantig'i
+                let center = (p.ax === 'y' ? p.y + p.h/2 : p.x + p.w/2);
+                let target = (p.ax === 'y' ? ball.y : ball.x);
+                if(center < target - 10) (p.ax === 'y' ? p.y += 4 : p.x += 4);
+                else if(center > target + 10) (p.ax === 'y' ? p.y -= 4 : p.x -= 4);
+            } else { // Inson boshqaruvi
+                if(keys[p.up]) (p.ax === 'y' ? p.y -= 6 : p.x -= 6);
+                if(keys[p.down]) (p.ax === 'y' ? p.y += 6 : p.x += 6);
+            }
+            // Chegaralar
+            if(p.ax === 'y') p.y = Math.max(0, Math.min(500, p.y));
+            else p.x = Math.max(0, Math.min(500, p.x));
+        });
+
+        ball.x += ball.dx; ball.y += ball.dy;
+
+        // To'qnashuv (Raketkalar) + 1% Tezlik
+        players.forEach(p => {
+            if(ball.x+ball.r > p.x && ball.x-ball.r < p.x+p.w && ball.y+ball.r > p.y && ball.y-ball.r < p.y+p.h) {
+                if(p.ax === 'y') ball.dx *= -1.19; else ball.dy *= -1.19;
+            }
+        });
+
+        // Ochko (Koptok chiqib ketsa)
+        let out = false;
+        if(ball.x < 0) { givePoints(0); out = true; }
+        else if(ball.x > 600) { givePoints(1); out = true; }
+        else if(ball.y < 0) { givePoints(2); out = true; }
+        else if(ball.y > 600) { givePoints(3); out = true; }
+
+        if(out) resetBall();
+        draw();
+    }
+
+    function givePoints(loserIdx) {
+        players.forEach((p, i) => { if(i !== loserIdx) p.s++; });
+        players.forEach((p, i) => document.getElementById(`s${i+1}`).innerText = p.s);
+    }
+
+    function draw() {
+        ctx.fillStyle = "#000"; ctx.fillRect(0,0,600,600);
+        players.forEach(p => { ctx.fillStyle = p.c; ctx.fillRect(p.x, p.y, p.w, p.h); });
+        ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2); ctx.fill();
+    }
+
+    function endGame() {
+        clearInterval(loop); clearInterval(timerInt);
+        alert("O'yin tugadi!");
+        location.reload();
+    }
+</script>
+</body>
+</html>

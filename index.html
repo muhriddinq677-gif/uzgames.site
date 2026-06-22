@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+   
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UZGamers </title>
+    <style>
+        /* Umumiy stillar */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            color: #fff;
+        }
+
+        /* 1. NAVBAR STILLARI */
+        .navbar {
+            background-color: #111;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 50px;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            border-bottom: 2px solid #16a085;
+        }
+        .navbar .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #16a085;
+            text-decoration: none;
+        }
+        .nav-links {
+            display: flex;
+            gap: 30px;
+        }
+        .nav-links a {
+            color: #fff;
+            text-decoration: none;
+            font-size: 1.1rem;
+            font-weight: 500;
+            transition: 0.3s;
+        }
+        .nav-links a:hover {
+            color: #16a085;
+        }
+
+        /* 2. HEADER STILLARI (O'yinlar haqida ma'lumot) */
+        .header-section {
+            background: linear-gradient(135deg, #1f2424, #111);
+            padding: 80px 20px;
+            text-align: center;
+        }
+        .header-section h1 {
+            font-size: 3rem;
+            color: #16a085;
+            margin-bottom: 20px;
+        }
+        .header-section p {
+            font-size: 1.2rem;
+            color: #ccc;
+            max-width: 800px;
+            margin: 0 auto 40px auto;
+            line-height: 1.6;
+        }
+        .game-types {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .game-card {
+            background-color: #222;
+            padding: 20px;
+            border-radius: 10px;
+            width: 250px;
+            border: 1px solid #333;
+            transition: 0.3s;
+        }
+        .game-card:hover {
+            border-color: #16a085;
+            transform: translateY(-5px);
+        }
+        .game-card h3 {
+            color: #16a085;
+            margin-top: 0;
+        }
+
+        /* 3. ASOSIY QISM (Portfolio / About Me bo'limi) */
+        .main-content {
+            padding: 60px 20px;
+            text-align: center;
+            background-color: #151515;
+        }
+        .btn-portfolio {
+            display: inline-block;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #fff;
+            background-color: #16a085;
+            text-decoration: none;
+            border-radius: 30px;
+            transition: 0.3s;
+            box-shadow: 0 4px 15px rgba(22, 160, 133, 0.3);
+        }
+        .btn-portfolio:hover {
+            background-color: #117a65;
+            transform: scale(1.05);
+        }
+
+        /* 4. FOOTER STILLARI */
+        .footer {
+            background-color: #111;
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 50px;
+            color: #777;
+            font-size: 0.95rem;
+            border-top: 1px solid #222;
+        }
+        .footer a {
+            color: #16a085;
+            text-decoration: none;
+            margin-left: 15px;
+            transition: 0.3s;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 1. NAVBAR BO'LIMI -->
+    <nav class="navbar">
+        <a href="#" class="logo">UZGamers</a>
+        <div class="nav-links">
+            <a href="games.html">Games </a>
+            <a href="https://muhriddinq677-gif.github.io/muhriddin.portfoilo/">About Me</a>
+        </div>
+    </nav>
+
+    <!-- 2. HEADER BO'LIMI (Sayt va o'yinlar haqida ma'lumot) -->
+    <header class="header-section">
+        <h1>UZGamers Browser Games Platformasi</h1>
+        <p>Portalimizga xush kelibsiz! Bu yerda siz mutlaqo tekin, yuklab olish talab etilmaydigan va brauzerning o'zida ishlaydigan eng qiziqarli mini-o'yinlarni topasiz. Miyani charxlovchi mantiqiy jumboqlardan tortib, tezkor poygalargacha barchasi siz uchun!</p>
+        
+        <!-- Qanaqa o'yinlar borligi haqida kartochkalar -->
+        <div class="game-types">
+            <div class="game-card">
+                <h3>🧩 Puzzellar</h3>
+                <p>Matematika o'yini, So'zni top va mantiqiy savollar bilan miyangizni sinang.</p>
+            </div>
+            <div class="game-card">
+                <h3>🚗 Poygalar</h3>
+                <p>Turli xil chizmali va klassik mashina o'yinlarida tezlikni his qiling.</p>
+            </div>
+            <div class="game-card">
+                <h3>⚽ Sport & Jang</h3>
+                <p>Football game, Penalty va Space Warrior o'yinlarida g'alaba qozoning.</p>
+            </div>
+        </div>
+    </header>
+
+    <!-- 3. MAIN BO'LIMI (Siz haqingizda / Portfolio) -->
+    <main class="main-content" id="about-me">
+        <h2>Dasturchi Haqida</h2>
+        <p style="color: #aaa; max-width: 600px; margin: 0 auto 30px auto; line-height: 1.6;">
+            Salom! Men ushbu o'yinlar portalining yaratuvchisiman. Mening boshqa dasturlash loyihalarim, portfoliom va men haqimdagi to'liq ma'lumot bilan tanishish uchun tugmani bosing.
+        </p>
+        <!-- PORTFOLIO LINKINGIZ: "men_haqimda_link" o'rniga o'z saytingiz yoki portfoliongiz linkini qo'ying -->
+        <a href="https://muhriddinq677-gif.github.io/muhriddin.portfoilo/" target="_blank" class="btn-portfolio">👤 Men haqimda</a>
+    </main>
+
+    <!-- 4. FOOTER BO'LIMI -->
+    <footer class="footer">
+        <span>&copy; 2026 UZGamers.com - Barcha huquqlar himoyalangan.</span>
+        <a href="privacy-policy.html">Privacy Policy</a>
+    </footer>
+
+</body>
+</html>

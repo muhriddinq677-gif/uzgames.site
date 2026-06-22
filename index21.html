@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ultimate Bricks Breaker</title>
+    <style>
+        body { 
+            margin: 0; background: #080808; color: white; font-family: sans-serif; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            height: 100vh; overflow: hidden; touch-action: none; 
+        }
+        #game-box { 
+            position: relative; border: 2px solid #444; background: #000; border-radius: 8px; 
+            width: clamp(300px, 92vw, 400px); aspect-ratio: 360 / 540;
+        }
+        .info { 
+            position: absolute; top: clamp(-35px, -8vw, -45px); width: 100%; 
+            display: flex; justify-content: space-between; font-weight: bold; 
+            color: #00f2ff; font-size: clamp(16px, 4vw, 20px); 
+        }
+        canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+    </style>
+</head>
+<body>
+
+    <div id="game-box">
+        <div class="info">
+            <span>LVL: <span id="lvl">1</span></span>
+            <span>BALLS: <span id="cnt">1</span></span>
+        </div>
+        <canvas id="game"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('game');
+        const ctx = canvas.getContext('2d');
+        const W = 360, H = 540;
+        canvas.width = W; canvas.height = H;
+
+        let level = 1, ballsTotal = 1, isShooting = false;
+        let ballsInPlay = [], bricks = [], items = [];
+        let startPos = { x: W / 2, y: H - 25 }; 
+        let nextStartPos = null; 
+        let aimPos = null;
+        let ballsFiredCount = 0;
+        const deathLineY = H - 70;
+
+        class Ball {
+            constructor(x, y, dx, dy) {
+                this.x = x; this.y = y; this.dx = dx; this.dy = dy;
+                this.r = 5; this.active = true;
+            }
+            update() {
+                this.x += this.dx * 10; this.y += this.dy * 10;
+                if (this.x < this.r || this.x > W - this.r) this.dx *= -1;
+                if (this.y < this.r) this.dy *= -1;
+                
+                if (this.y > H - this.r) {
+                    if (nextStartPos === null) nextStartPos = { x: this.x, y: H - 25 };
+                    this.active = false;
+                }
+
+                bricks.forEach(b => {
+                    if (b.hp > 0 && this.x + this.r > b.x && this.x - this.r < b.x + b.w && this.y + this.r > b.y && this.y - this.r < b.y + b.h) {
+                        let ox = Math.min(this.x - b.x, b.x + b.w - this.x);
+                        let oy = Math.min(this.y - b.y, b.y + b.h - this.y);
+                        if (ox < oy) this.dx *= -1; else this.dy *= -1;
+                        b.hp--;
+                    }
+                });
+
+                items.forEach(it => {
+                    if (it.active && Math.hypot(this.x - it.x, this.y - it.y) < 15) {
+                        it.pending = true; it.active = false;
+                    }
+                });
+            }
+            draw() {
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI*2);
+                ctx.fillStyle = "#fff"; ctx.fill();
+            }
+        }
+
+        function createRow() {
+            let cols = 6, rowH = 40, colW = W / cols;
+            for (let i = 0; i < cols; i++) {
+                let r = Math.random();
+                if (r > 0.45) bricks.push({ x: i*colW+3, y: 30, w: colW-6, h: rowH-6, hp: level });
+                else if (r < 0.15) items.push({ x: i*colW + colW/2, y: 30 + rowH/2, active: true, pending: false });
+            }
+        }
+
+        function fire(tx, ty) {
+            isShooting = true;
+            nextStartPos = null; 
+            ballsFiredCount = 0;
+            let angle = Math.atan2(ty - startPos.y, tx - startPos.x);
+            let timer = setInterval(() => {
+                ballsInPlay.push(new Ball(startPos.x, startPos.y, Math.cos(angle), Math.sin(angle)));
+                ballsFiredCount++;
+                if (ballsFiredCount >= ballsTotal) clearInterval(timer);
+            }, 60);
+        }
+
+        const getP = e => {
+            let r = canvas.getBoundingClientRect();
+            let t = (e.touches) ? e.touches[0] : e;
+            return { x: (t.clientX - r.left) * (W / r.width), y: (t.clientY - r.top) * (H / r.height) };
+        };
+
+        // SUDRAMA BOSHQARUV (DRAG CONTROL)
+        canvas.addEventListener('touchstart', e => { 
+            if(!isShooting) aimPos = getP(e); 
+            e.preventDefault(); 
+        }, {passive: false});
+
+        window.addEventListener('touchmove', e => { 
+            if(aimPos) aimPos = getP(e); 
+        }, {passive: false});
+
+        window.addEventListener('touchend', e => {
+            if (aimPos && !isShooting && aimPos.y < startPos.y - 20) fire(aimPos.x, aimPos.y);
+            aimPos = null;
+        });
+
+        // Sichqoncha uchun ham (PC)
+        canvas.onmousedown = e => { if(!isShooting) aimPos = getP(e); };
+        window.onmousemove = e => { if(aimPos) aimPos = getP(e); };
+        window.onmouseup = e => {
+            if (aimPos && !isShooting && aimPos.y < startPos.y - 20) fire(aimPos.x, aimPos.y);
+            aimPos = null;
+        };
+
+        function loop() {
+            ctx.fillStyle = "rgba(0,0,0,0.4)"; ctx.fillRect(0,0,W,H);
+            
+            ctx.beginPath(); ctx.moveTo(0, deathLineY); ctx.lineTo(W, deathLineY);
+            ctx.strokeStyle = "rgba(255, 0, 0, 0.3)"; ctx.stroke();
+
+            ctx.beginPath(); ctx.arc(startPos.x, startPos.y, 10, 0, Math.PI*2);
+            ctx.fillStyle = "#111"; ctx.fill(); ctx.strokeStyle = "#00f2ff"; ctx.stroke();
+
+            bricks = bricks.filter(b => b.hp > 0);
+            bricks.forEach(b => {
+                ctx.strokeStyle = `hsl(${b.hp*35 % 360}, 80%, 50%)`; ctx.lineWidth = 2;
+                ctx.strokeRect(b.x, b.y, b.w, b.h);
+                ctx.fillStyle = "white"; ctx.textAlign = "center";
+                ctx.fillText(b.hp, b.x + b.w/2, b.y + b.h/2 + 5);
+            });
+
+            items.forEach(it => {
+                if(!it.active) return;
+                ctx.beginPath(); ctx.arc(it.x, it.y, 8, 0, Math.PI*2);
+                ctx.strokeStyle = "#0f0"; ctx.stroke();
+                ctx.fillStyle = "white"; ctx.fillText("+", it.x, it.y+4);
+            });
+
+            ballsInPlay.forEach((b, i) => {
+                b.update(); b.draw();
+                if (!b.active) ballsInPlay.splice(i, 1);
+            });
+
+            if (aimPos && !isShooting) {
+                ctx.beginPath(); ctx.setLineDash([5, 5]); // Nuqtali chiziq
+                ctx.moveTo(startPos.x, startPos.y);
+                ctx.lineTo(aimPos.x, aimPos.y); ctx.strokeStyle = "rgba(0,242,255,0.8)";
+                ctx.stroke(); ctx.setLineDash([]); // Chiziqni qaytarish
+            }
+
+            if (isShooting && ballsInPlay.length === 0 && ballsFiredCount >= ballsTotal) {
+                items.forEach(it => { if(it.pending) ballsTotal++; });
+                items = items.filter(it => it.active); 
+                document.getElementById('cnt').innerText = ballsTotal;
+                if (nextStartPos) startPos = nextStartPos;
+                level++; 
+                document.getElementById('lvl').innerText = level;
+                bricks.forEach(b => b.y += 40); 
+                items.forEach(it => it.y += 40);
+                createRow();
+                isShooting = false;
+                if (bricks.some(b => b.y + b.h > deathLineY)) { 
+                    alert("O'yin tugadi! Level: " + (level-1)); 
+                    location.reload(); 
+                }
+            }
+            requestAnimationFrame(loop);
+        }
+
+        createRow(); loop();
+    </script>
+</body>
+</html>

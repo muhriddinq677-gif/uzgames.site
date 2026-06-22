@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title> Mashina o'yini1</title>
+<style>
+body{
+  margin:0;
+  font-family:Arial,sans-serif;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  overflow:hidden;
+}
+h1{margin:10px 0;}
+#top-panel{
+  display:flex;
+  gap:15px;
+  flex-wrap:wrap;
+  justify-content:center;
+  margin-bottom:10px;
+}
+#game-area{
+  position:relative;
+  width:95vw;
+  max-width:420px;
+  height:80vh;
+  max-height:600px;
+  overflow:hidden;
+  border-radius:10px;
+}
+.road-line{
+  position:absolute;
+  width:6px;
+  height:60px;
+  left:50%;
+  transform:translateX(-50%);
+}
+.car{
+  position:absolute;
+  width:18%;
+  max-width:70px;
+  aspect-ratio:7/12;
+}
+.player{ bottom:10px; }
+.car-body{ position:absolute; width:100%; height:80%; border-radius:20px; bottom:0; }
+.window{ position:absolute; width:60%; height:30%; background:skyblue; top:20%; left:20%; border-radius:8px; }
+.headlight{ position:absolute; width:10px; height:15px; bottom:5px; border-radius:4px; background:yellow; }
+.headlight.left{ left:10px; }
+.headlight.right{ right:10px; }
+.wheel{ position:absolute; width:15px; height:25px; background:black; border-radius:6px; }
+.wheel.front-left{ top:15px; left:-8px; }
+.wheel.front-right{ top:15px; right:-8px; }
+.wheel.back-left{ bottom:15px; left:-8px; }
+.wheel.back-right{ bottom:15px; right:-8px; }
+
+button, select{
+  padding:8px 15px;
+  border:none;
+  border-radius:8px;
+  font-size:14px;
+  cursor:pointer;
+}
+button{ background:#ff9800; color:white; }
+button:hover{ background:#e68900; }
+
+#mobile-controls{
+  position:fixed;
+  bottom:15px;
+  display:flex;
+  justify-content:space-between;
+  width:100%;
+  max-width:420px;
+  padding:0 10px;
+  pointer-events:none;
+}
+.arrow-btn{
+  width:60px;
+  height:60px;
+  font-size:26px;
+  border-radius:50%;
+  pointer-events:all;
+}
+
+@media(min-width:768px){
+  #mobile-controls{ display:flex; }
+}
+
+.light-mode{ background:#ddd; color:#111; }
+.light-mode #game-area{ background:#aaa; }
+.light-mode .road-line{ background:white; }
+
+.dark-mode{ background:#111; color:white; }
+.dark-mode #game-area{ background:#333; }
+.dark-mode .road-line{ background:white; }
+
+/* Olov animatsiyasi */
+.fire{
+  position:absolute;
+  width:60px;
+  height:60px;
+  background: radial-gradient(circle, yellow 0%, orange 40%, red 70%);
+  border-radius:50%;
+  animation:burn 0.5s ease-out forwards;
+}
+@keyframes burn{
+  0%{ transform:scale(0.3); opacity:1; }
+  100%{ transform:scale(2); opacity:0; }
+}
+</style>
+</head>
+
+<body class="dark-mode">
+<h1>Poyga O'yini</h1>
+
+<div id="top-panel">
+  <div>Ball: <span id="score">0</span></div>
+  <div>Level: <span id="level">1</span></div>
+
+  <select id="colorSelect">
+    <option value="red">Qizil</option>
+    <option value="blue">Ko'k</option>
+    <option value="green">Yashil</option>
+    <option value="yellow">Sariq</option>
+  </select>
+
+  <select id="modeSelect">
+    <option value="dark">Tungi Rejim</option>
+    <option value="light">Kunduzgi Rejim</option>
+  </select>
+
+  <button id="startBtn">Boshlash</button>
+</div>
+
+<div id="game-area"></div>
+
+<div id="mobile-controls">
+  <button class="arrow-btn" id="leftBtn">⬅</button>
+  <button class="arrow-btn" id="rightBtn">➡</button>
+</div>
+
+<script>
+const gameArea=document.getElementById("game-area");
+const scoreEl=document.getElementById("score");
+const levelEl=document.getElementById("level");
+const colorSelect=document.getElementById("colorSelect");
+const modeSelect=document.getElementById("modeSelect");
+
+let player, obstacles=[], score=0, level=1, baseSpeed=4, speed=4;
+let laneCenters=[], lines=[], gameInterval, spawnInterval, lineInterval, currentLane=0;
+
+function calculateLanes(){
+  const width=gameArea.clientWidth;
+  laneCenters=[ width*0.25, width*0.75 ];
+}
+
+function createRoad(){
+  calculateLanes();
+  for(let i=0;i<6;i++){
+    const line=document.createElement("div");
+    line.classList.add("road-line");
+    line.style.top=i*120+"px";
+    gameArea.appendChild(line);
+    lines.push(line);
+  }
+}
+
+function moveRoad(){
+  lines.forEach(line=>{
+    let top=parseInt(line.style.top);
+    top+=speed;
+    if(top>gameArea.clientHeight) top=-60;
+    line.style.top=top+"px";
+  });
+}
+
+function createCar(lane,color,isPlayer=false){
+  const car=document.createElement("div");
+  car.classList.add("car");
+  if(isPlayer) car.classList.add("player");
+
+  const body=document.createElement("div");
+  body.classList.add("car-body");
+  body.style.background=color;
+
+  const windowDiv=document.createElement("div");
+  windowDiv.classList.add("window");
+
+  const headL=document.createElement("div");
+  headL.classList.add("headlight","left");
+
+  const headR=document.createElement("div");
+  headR.classList.add("headlight","right");
+
+  const wheels=["front-left","front-right","back-left","back-right"];
+  wheels.forEach(pos=>{
+    const w=document.createElement("div");
+    w.classList.add("wheel",pos);
+    car.appendChild(w);
+  });
+
+  car.appendChild(body);
+  car.appendChild(windowDiv);
+  car.appendChild(headL);
+  car.appendChild(headR);
+
+  gameArea.appendChild(car);
+  car.style.left=(laneCenters[lane] - car.offsetWidth/2)+"px";
+  return car;
+}
+
+function startGame(){
+  gameArea.innerHTML="";
+  obstacles=[];
+  lines=[];
+  score=0; level=1; baseSpeed=4; speed=4; currentLane=0;
+  scoreEl.textContent=score; levelEl.textContent=level;
+  createRoad();
+  player=createCar(currentLane,colorSelect.value,true);
+  gameInterval=setInterval(gameLoop,20);
+  spawnInterval=setInterval(spawnObstacle,1800);
+  lineInterval=setInterval(moveRoad,20);
+}
+
+function spawnObstacle(){
+  const lane=Math.random()<0.5?0:1;
+  const enemy=createCar(lane,"white");
+  enemy.style.top="-150px";
+  obstacles.push(enemy);
+}
+
+function gameLoop(){
+  obstacles.forEach((car,index)=>{
+    let top=parseInt(car.style.top);
+    top+=speed;
+    car.style.top=top+"px";
+
+    if(top>gameArea.clientHeight){
+      car.remove();
+      obstacles.splice(index,1);
+      score++;
+      scoreEl.textContent=score;
+
+      if(score%5===0){
+        level++;
+        levelEl.textContent=level;
+        speed = baseSpeed + level*1.5;
+        clearInterval(spawnInterval);
+        spawnInterval=setInterval(spawnObstacle, Math.max(700,1800 - level*100));
+      }
+    }
+
+    if(checkCollision(player,car)){
+      createFire(car.offsetLeft + car.offsetWidth/2 -30, car.offsetTop + car.offsetHeight/2 -30);
+      endGame();
+    }
+  });
+}
+
+function createFire(x,y){
+  const f=document.createElement("div");
+  f.classList.add("fire");
+  f.style.left=x+"px";
+  f.style.top=y+"px";
+  gameArea.appendChild(f);
+  setTimeout(()=>f.remove(),500);
+}
+
+function checkCollision(a,b){
+  const r1=a.getBoundingClientRect();
+  const r2=b.getBoundingClientRect();
+  return !(r1.right<r2.left || r1.left>r2.right || r1.bottom<r2.top || r1.top>r2.bottom);
+}
+
+function movePlayer(direction){
+  if(direction==="left" && currentLane>0) currentLane--;
+  if(direction==="right" && currentLane<1) currentLane++;
+  player.style.left=(laneCenters[currentLane] - player.offsetWidth/2)+"px";
+}
+
+function endGame(){
+  clearInterval(gameInterval);
+  clearInterval(spawnInterval);
+  clearInterval(lineInterval);
+  alert("O'yin tugadi! Ball: "+score);
+}
+
+document.getElementById("startBtn").onclick=startGame;
+
+document.addEventListener("keydown",e=>{
+  if(e.key==="ArrowLeft") movePlayer("left");
+  if(e.key==="ArrowRight") movePlayer("right");
+});
+
+document.getElementById("leftBtn").onclick=()=>movePlayer("left");
+document.getElementById("rightBtn").onclick=()=>movePlayer("right");
+
+let startX=0;
+gameArea.addEventListener("touchstart",e=>{ startX=e.touches[0].clientX; });
+gameArea.addEventListener("touchend",e=>{
+  let endX=e.changedTouches[0].clientX;
+  if(endX-startX>50) movePlayer("right");
+  if(startX-endX>50) movePlayer("left");
+});
+
+modeSelect.addEventListener("change",()=>{
+  document.body.className = modeSelect.value==="light"?"light-mode":"dark-mode";
+});
+</script>
+</body>
+</html>

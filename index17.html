@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Universal Puzzle </title>
+    <style>
+        :root { --neon: #00f3ff; --green: #39ff14; }
+        body { 
+            background: #0a0a0a; color: white; font-family: sans-serif; 
+            display: flex; flex-direction: column; align-items: center; 
+            margin: 0; padding: 10px; overflow-x: hidden;
+            touch-action: manipulation; /* Mobil uchun optimallashtirish */
+        }
+        
+        .controls { 
+            background: #1a1a1a; padding: 10px; border-radius: 12px; 
+            border: 1px solid var(--neon); margin-bottom: 15px; 
+            text-align: center; width: 95%; max-width: 400px; 
+        }
+        
+        #timer { font-size: 2rem; color: #ff0055; font-family: monospace; margin-bottom: 5px; }
+        
+        /* RESPONSIV O'YIN MAYDONI */
+        #board { 
+            display: grid; 
+            width: 90vw; /* Ekran kengligining 90 foizi */
+            height: 90vw; /* Balandligi ham kengligiga teng (Kvadrat) */
+            max-width: 400px; /* Kompyuterda 400px dan oshmaydi */
+            max-height: 400px;
+            border: 3px solid #333; 
+            background: #000;
+            position: relative;
+        }
+
+        .slot { width: 100%; height: 100%; position: relative; }
+        .slot.match-hover { background: rgba(57, 255, 20, 0.3) !important; box-shadow: inset 0 0 20px var(--green); }
+
+        #pieces-area { 
+            display: flex; flex-wrap: wrap; gap: 10px; 
+            justify-content: center; margin-top: 20px; 
+            padding: 15px; width: 100%; min-height: 120px; 
+            border-top: 1px solid #333; 
+        }
+        
+        canvas { cursor: grab; display: block; filter: drop-shadow(0 0 2px black); }
+        canvas.placed { filter: none; cursor: default; }
+
+        .slot canvas {
+            position: absolute;
+            width: 150% !important; /* Tishchalar sig'ishi uchun kengroq */
+            height: 150% !important;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        input, button { background: #222; color: white; border: 1px solid var(--neon); padding: 8px; border-radius: 6px; margin: 2px; font-size: 0.9rem; }
+        .btn-main { background: var(--neon); color: black; font-weight: bold; cursor: pointer; border: none; padding: 10px 15px; }
+
+        @media (max-width: 350px) {
+            #timer { font-size: 1.5rem; }
+            .btn-main { padding: 8px 10px; font-size: 0.8rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <div id="timer">00:00</div>
+        Vaqt (sek): <input type="number" id="userTime" value="60" style="width:60px">
+        <button class="btn-main" onclick="document.getElementById('fileImg').click()">Rasm Tanlash</button>
+        <input type="file" id="fileImg" accept="image/*" style="display:none">
+    </div>
+
+    <div id="board"></div>
+    <div id="pieces-area"></div>
+
+    <script>
+        let gridSize = 3;
+        let timeLeft, timerInterval, draggedPiece = null;
+        let currentBoardSize;
+
+        document.getElementById('fileImg').onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => startGame(ev.target.result);
+            reader.readAsDataURL(file);
+        };
+
+        function startGame(imgSrc) {
+            const img = new Image();
+            img.src = imgSrc;
+            img.onload = () => {
+                clearInterval(timerInterval);
+                const board = document.getElementById('board');
+                const piecesArea = document.getElementById('pieces-area');
+                
+                board.innerHTML = ''; piecesArea.innerHTML = '';
+                board.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+                
+                // Responsiv o'lchamni aniqlash
+                currentBoardSize = board.clientWidth;
+                timeLeft = parseInt(document.getElementById('userTime').value) || 60;
+                
+                const sSize = currentBoardSize / gridSize;
+                const tSize = sSize * 0.25;
+
+                for (let i = 0; i < gridSize * gridSize; i++) {
+                    const slot = document.createElement('div');
+                    slot.className = 'slot';
+                    slot.dataset.idx = i;
+                    slot.ondragover = (e) => { e.preventDefault(); if (draggedPiece && draggedPiece.dataset.idx == slot.dataset.idx) slot.classList.add('match-hover'); };
+                    slot.ondragleave = () => slot.classList.remove('match-hover');
+                    slot.ondrop = function() {
+                        this.classList.remove('match-hover');
+                        if (!this.firstChild && draggedPiece && draggedPiece.dataset.idx == this.dataset.idx) {
+                            draggedPiece.classList.add('placed');
+                            renderPiece(draggedPiece, img, draggedPiece.dataset.idx, false);
+                            this.appendChild(draggedPiece);
+                            checkWin();
+                        }
+                    };
+                    board.appendChild(slot);
+                }
+
+                let pieces = [];
+                for (let i = 0; i < gridSize * gridSize; i++) {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = sSize + tSize * 2;
+                    canvas.height = sSize + tSize * 2;
+                    canvas.style.width = (sSize + tSize * 2) + "px";
+                    canvas.dataset.idx = i;
+                    canvas.draggable = true;
+                    renderPiece(canvas, img, i, true);
+                    canvas.ondragstart = () => { draggedPiece = canvas; };
+                    pieces.push(canvas);
+                }
+                pieces.sort(() => Math.random() - 0.5).forEach(p => piecesArea.appendChild(p));
+                startTimer();
+            };
+        }
+
+        function renderPiece(canvas, img, idx, hasBorder) {
+            const ctx = canvas.getContext('2d');
+            const sSize = currentBoardSize / gridSize;
+            const tSize = sSize * 0.25;
+            const xIdx = idx % gridSize;
+            const yIdx = Math.floor(idx / gridSize);
+            const offset = tSize;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(offset, offset);
+            
+            // To'rtburchak tishchalar mantiqi
+            if (yIdx > 0) { ctx.lineTo(offset + sSize*0.35, offset); ctx.lineTo(offset + sSize*0.35, offset + tSize); ctx.lineTo(offset + sSize*0.65, offset + tSize); ctx.lineTo(offset + sSize*0.65, offset); }
+            ctx.lineTo(offset + sSize, offset);
+            if (xIdx < gridSize - 1) { ctx.lineTo(offset + sSize, offset + sSize*0.35); ctx.lineTo(offset + sSize + tSize, offset + sSize*0.35); ctx.lineTo(offset + sSize + tSize, offset + sSize*0.65); ctx.lineTo(offset + sSize, offset + sSize*0.65); }
+            ctx.lineTo(offset + sSize, offset + sSize);
+            if (yIdx < gridSize - 1) { ctx.lineTo(offset + sSize*0.65, offset + sSize); ctx.lineTo(offset + sSize*0.65, offset + sSize + tSize); ctx.lineTo(offset + sSize*0.35, offset + sSize + tSize); ctx.lineTo(offset + sSize*0.35, offset + sSize); }
+            ctx.lineTo(offset, offset + sSize);
+            if (xIdx > 0) { ctx.lineTo(offset, offset + sSize*0.65); ctx.lineTo(offset + tSize, offset + sSize*0.65); ctx.lineTo(offset + tSize, offset + sSize*0.35); ctx.lineTo(offset, offset + sSize*0.35); }
+            ctx.closePath();
+            ctx.clip();
+
+            const sw = img.width / gridSize;
+            const sh = img.height / gridSize;
+            ctx.drawImage(img, xIdx * sw, yIdx * sh, sw, sh, offset, offset, sSize, sSize);
+            
+            // Tishcha ichidagi rasm davomi
+            if (xIdx < gridSize - 1) ctx.drawImage(img, (xIdx+1)*sw, yIdx*sh, sw, sh, offset+sSize, offset, sSize, sSize);
+            if (yIdx < gridSize - 1) ctx.drawImage(img, xIdx*sw, (yIdx+1)*sh, sw, sh, offset, offset+sSize, sSize, sSize);
+
+            ctx.restore();
+            if (hasBorder) { ctx.strokeStyle = "var(--neon)"; ctx.lineWidth = 2; ctx.stroke(); }
+        }
+
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                const m = Math.floor(timeLeft / 60), s = timeLeft % 60;
+                document.getElementById('timer').innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+                if (timeLeft <= 0) { clearInterval(timerInterval); alert("Vaqt tugadi!"); location.reload(); }
+            }, 1000);
+        }
+
+        function checkWin() {
+            const slots = document.querySelectorAll('.slot');
+            if (Array.from(slots).every(s => s.firstChild)) {
+                clearInterval(timerInterval);
+                setTimeout(() => { alert("G'alaba!"); gridSize++; document.getElementById('board').innerHTML = ''; }, 300);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arrows Path - 100 Levels</title>
+    <style>
+        :root {
+            --bg-main: #0b0f19;
+            --bg-card: #151d30;
+            --accent: #3b82f6;
+            --panel-bg: #091124;
+            --brown-block: #543d34; /* Rasmdagi to'q jigarrang bloklar */
+            --dot-color: #b1b9c4;  /* Rasmdagi kulrang fon nuqtachalari */
+        }
+
+        body {
+            margin: 0; padding: 0;
+            background-color: var(--bg-main);
+            color: #f8fafc; font-family: system-ui, -apple-system, sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 100vh; overflow: hidden; user-select: none; touch-action: manipulation;
+        }
+
+        .screen {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            width: 100%; max-width: 450px; padding: 15px; box-sizing: border-box;
+        }
+
+        .hud {
+            text-align: center; width: 100%; margin-bottom: 15px;
+            font-size: 1.2rem; font-weight: bold; background: var(--panel-bg); padding: 14px 20px;
+            border-radius: 12px; box-sizing: border-box; border: 1px solid #1e293b; color: #38bdf8;
+            letter-spacing: 0.5px;
+        }
+
+        /* 📱 RASMDAGI KREM RANG RESPONSIV KONTEYNER */
+        .board-wrapper {
+            width: 100%; max-width: 400px; aspect-ratio: 1 / 1;
+            background: #fdfbf7; border-radius: 24px; padding: 12px;
+            box-sizing: border-box; border: 2px solid #e2ded5;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        .board {
+            display: grid; width: 100%; height: 100%;
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Katakchalar foni */
+        .dot-container {
+            position: relative; display: flex; align-items: center; justify-content: center;
+            width: 100%; height: 100%; box-sizing: border-box;
+        }
+
+        /* Fon nuqtachalari */
+        .grid-dot {
+            width: 4px; height: 4px; background-color: var(--dot-color); border-radius: 50%;
+            z-index: 1; transition: opacity 0.2s;
+        }
+
+        /* 🔥 RASMDAGIDEK JOYNLI TO'LIQ TO'LDIRUVCHI JIGARRANG BLOKLAR */
+        .path-line {
+            position: absolute; width: 101%; height: 101%; /* Kataklar orasida ochiq joy qolmaydi */
+            background-color: var(--brown-block); z-index: 5;
+            animation: blockPop 0.15s ease-out forwards;
+        }
+
+        /* 🎯 STRELKALAR - JIGARRANG BLOKNING BOSHLANISHIGA SAFLANGAN */
+        .arrow-item {
+            position: absolute; font-size: 20px; color: #5d4037; /* To'q jigarrang strelka */
+            font-weight: bold; cursor: pointer; z-index: 12;
+            display: flex; align-items: center; justify-content: center;
+            width: 100%; height: 100%;
+        }
+        /* Strelka yo'nalishlari burchagi */
+        .arrow-item.up { transform: rotate(-90deg); }
+        .arrow-item.down { transform: rotate(90deg); }
+        .arrow-item.left { transform: rotate(180deg); }
+        .arrow-item.right { transform: rotate(0deg); }
+
+        .shake-error { animation: arrowShake 0.3s ease; color: #ef4444 !important; }
+
+        /* Tugmalar dizayni */
+        .game-controls { display: flex; gap: 10px; width: 100%; margin-top: 20px; }
+        .btn {
+            border: none; color: white; padding: 12px 15px; font-size: 1rem;
+            font-weight: bold; border-radius: 12px; cursor: pointer; transition: background 0.2s, transform 0.1s;
+        }
+        .btn:active { transform: scale(0.96); }
+        .btn-control { background: #3b82f6; flex: 1; }
+        .btn-reset { background: #475569; width: auto; padding: 12px 20px; } 
+
+        /* Modal yutuq oynasi */
+        .modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(2, 6, 23, 0.85); backdrop-filter: blur(4px); z-index: 100;
+            justify-content: center; align-items: center;
+        }
+        .modal-content {
+            background: var(--bg-card); padding: 30px; border-radius: 16px;
+            max-width: 360px; width: 85%; border: 1px solid #1e293b; text-align: center;
+        }
+
+        @keyframes blockPop {
+            from { transform: scale(0.6); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes arrowShake {
+            0%, 100% { transform: translate(0, 0); }
+            25% { transform: translate(-4px, -4px); }
+            75% { transform: translate(4px, 4px); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="screen">
+        <div class="hud" id="hud-left">🧩 Daraja: 1 / 100</div>
+
+        <!-- O'yin maydoni -->
+        <div class="board-wrapper">
+            <div class="board" id="board"></div>
+        </div>
+
+        <!-- Boshqaruv elementlari -->
+        <div class="game-controls">
+            <button class="btn btn-control" onclick="rotateBoard(-45)">🔄 Chapga</button>
+            <button class="btn btn-reset" onclick="resetLevel()">🔁 Qayta boshlash</button>
+            <button class="btn btn-control" onclick="rotateBoard(45)">🔄 O'ngga</button>
+        </div>
+    </div>
+
+    <!-- G'alaba modal oynasi -->
+    <div class="modal" id="result-modal">
+        <div class="modal-content">
+            <h2 id="modal-title">G'alaba! 🎉</h2>
+            <p id="modal-desc">Mantiqiy zanjirni to'g'ri topdingiz.</p>
+            <button class="btn btn-control" id="modal-btn" onclick="handleModalAction()">Davom Etish</button>
+        </div>
+    </div>
+
+    <script>
+       
+
+// ==========================================================
+// TO'LIQ JAVASCRIPT KODI (100 TA DARALALI QO'LDA YOZILADIGAN VARIANT)
+// ==========================================================
+
+let currentLevel = 1; 
+let boardRotation = 0;
+let isAnimating = false;
+
+// 10x10 nuqtalar o'lchami hamma narsani mukammal sig'diradi
+let gridRows = 10;
+let gridCols = 10;
+let gridMatrix = [];
+let activeArrowsCount = 0;
+
+const board = document.getElementById('board');
+const hudLeft = document.getElementById('hud-left');
+const resultModal = document.getElementById('result-modal');
+
+// Ekran va panelni burish funksiyasi
+function rotateBoard(deg) {
+    boardRotation += deg;
+    board.style.transform = `rotateZ(${boardRotation}deg)`;
+}
+
+// Modal yutuq oynasini ko'rsatish
+function showModal(title, desc, btnText) {
+    document.getElementById('modal-title').innerText = title;
+    document.getElementById('modal-desc').innerText = desc;
+    const btn = document.getElementById('modal-btn');
+    btn.innerText = btnText;
+    resultModal.style.display = 'flex';
+}
+
+// Keyingi bosqichga o'tish harakati
+function handleModalAction() {
+    resultModal.style.display = 'none';
+    if (currentLevel < 100) {
+        currentLevel++;
+        initGame();
+    } else {
+        showModal("🔥 MARRA!", "Siz barcha 100 ta mantiqiy darajani engdingiz!", "Qayta boshlash");
+        currentLevel = 1;
+        initGame();
+    }
+}
+
+// Darajani qayta boshlash funksiyasi
+function resetLevel() {
+    if (isAnimating) return;
+    initGame();
+}
+
+// 🎯 DARAJA OMBORE (6-DAN 100-GACHA BO'LGAN BOSQICHLARNI SHU YERGA QO'SHASIZ)
+const levelPaths = {
+    // 1-Daraja: To'siqsiz, faqat 2 ta strelka. Oson yechiladi, yo'llar kesishmaydi!
+    1: [
+        { id: 1, startR: 3, startC: 2, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 6, startC: 2, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    // 2-Daraja: 2 ta strelka, burchaklar bilan burilib chiqadi, bir-biriga xalaqit bermaydi
+    2: [
+        { id: 1, startR: 2, startC: 3, dir: 'D', steps: ['D', 'D', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 7, startC: 3, dir: 'U', steps: ['U', 'U', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    // 3-Daraja: 3 ta strelka, yo'llari parallel va tartibli
+    3: [
+        { id: 1, startR: 2, startC: 2, dir: 'R', steps: ['R', 'R', 'D', 'D', 'R', 'R', 'R'] },
+        { id: 2, startR: 5, startC: 2, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 8, startC: 2, dir: 'R', steps: ['R', 'R', 'U', 'U', 'R', 'R', 'R'] }
+    ],
+    // 4-Daraja: Chiziqlar labirint hosil qilishni boshlaydi
+ 
+     4: [
+        // 1-strelka: Maydonning tepadagi qismidan faqat o'ngga va pastga qarab chetdan yuradi
+        { id: 1, startR: 2, startC: 2, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'D', 'D'] },
+        // 2-strelka: Maydonning pastki qismidan faqat pastga va o'ngga qarab butunlay boshqa yo'ldan yuradi
+        { id: 2, startR: 6, startC: 2, dir: 'D', steps: ['D', 'D', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+
+    // 5-Daraja: Spiral zanjir boshlanishi
+       5: [
+        // 1-strelka: Maydonning chap tepasidan boshlanib, faqat yuqoriga va o'ngga qarab ketadi
+        { id: 1, startR: 2, startC: 2, dir: 'U', steps: ['U', 'U', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        // 2-strelka: Maydonning o'ng pastidan boshlanib, faqat pastga va chapga qarab butunlay ayro yo'ldan ketadi
+        { id: 2, startR: 7, startC: 7, dir: 'D', steps: ['D', 'D', 'L', 'L', 'L', 'L', 'L', 'L'] }
+    ],
+        6: [
+        { id: 1, startR: 2, startC: 1, dir: 'L', steps: ['R', 'D', 'R', 'U', 'L', 'U'] },
+        { id: 2, startR: 2, startC: 7, dir: 'R', steps: ['R', 'R', 'R', 'R', 'U', 'U'] }
+    ],
+    7: [
+        { id: 1, startR: 1, startC: 4, dir: 'U', steps: ['U', 'L', 'U', 'L', 'D', 'R'] },
+        { id: 2, startR: 7, startC: 6, dir: 'L', steps: ['L', 'D', 'D', 'R', 'R', 'D'] }
+    ],
+    8: [
+        { id: 1, startR: 2, startC: 6, dir: 'L', steps: ['R', 'R', 'D', 'D', 'R', 'U', 'L', 'D'] },
+        { id: 2, startR: 2, startC: 5, dir: 'L', steps: ['L', 'D', 'L', 'D', 'R', 'U', 'R', 'D'] }
+    ],
+    9: [
+        { id: 1, startR: 2, startC: 4, dir: 'R', steps: ['R', 'D', 'D', 'L', 'L', 'D', 'D'] },
+        { id: 2, startR: 6, startC: 4, dir: 'L', steps: ['R', 'D', 'R', 'R', 'U', 'U', 'R', 'R'] }
+    ],
+    10: [
+        { id: 1, startR: 4, startC: 3, dir: 'U', steps: ['U', 'L', 'U', 'U', 'U', 'R', 'U'] },
+        { id: 2, startR: 6, startC: 1, dir: 'D', steps: ['D', 'D', 'D', 'D', 'R', 'R'] }
+    ],
+        11: [
+        { id: 1, startR: 3, startC: 4, dir: 'U', steps: ['U', 'U', 'U', 'U'] },
+        { id: 2, startR: 6, startC: 2, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    12: [
+        { id: 1, startR: 2, startC: 2, dir: 'D', steps: ['D', 'D', 'L', 'U', 'U', 'R', 'R', 'R'] },
+        { id: 2, startR: 5, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    13: [
+        { id: 1, startR: 3, startC: 2, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 6, startC: 4, dir: 'D', steps: ['D', 'D', 'D', 'D'] }
+    ],
+    14: [
+        { id: 1, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R'] },
+        { id: 2, startR: 2, startC: 3, dir: 'D', steps: ['D', 'D', 'D', 'D'] }
+    ],
+    15: [
+        { id: 1, startR: 3, startC: 4, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 5, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    16: [
+        { id: 1, startR: 4, startC: 2, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 1, startC: 6, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    17: [
+        { id: 1, startR: 8, startC: 2, dir: 'U', steps: ['U', 'U', 'U', 'U', 'U', 'U', 'U', 'U'] },
+        { id: 2, startR: 3, startC: 4, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    18: [
+        { id: 1, startR: 6, startC: 2, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 3, startC: 5, dir: 'U', steps: ['U', 'U', 'U', 'U'] }
+    ],
+    19: [
+        { id: 1, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 4, startC: 4, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    20: [
+        { id: 1, startR: 8, startC: 3, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 3, startC: 1, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    21: [
+        { id: 1, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 5, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    22: [
+        { id: 1, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 5, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    23: [
+        { id: 1, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 5, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    24: [
+        { id: 1, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 5, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    25: [
+        { id: 1, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 5, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    26: [
+        { id: 1, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 5, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    27: [
+        { id: 1, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 5, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    28: [
+        { id: 1, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 5, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    29: [
+        { id: 1, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 5, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    30: [
+        { id: 1, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 5, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    31: [
+        { id: 1, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 5, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    32: [
+        { id: 1, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 5, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    33: [
+        { id: 1, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 5, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    34: [
+        { id: 1, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 5, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    35: [
+        { id: 1, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 5, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    36: [
+        { id: 1, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 5, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    37: [
+        { id: 1, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 5, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    38: [
+        { id: 1, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 5, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    39: [
+        { id: 1, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 5, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    40: [
+        { id: 1, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 5, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+        41: [
+        { id: 1, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 4, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 6, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    42: [
+        { id: 1, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 4, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 6, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    43: [
+        { id: 1, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 4, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 6, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    44: [
+        { id: 1, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 4, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 6, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    45: [
+        { id: 1, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 4, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 6, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    46: [
+        { id: 1, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 4, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 6, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    47: [
+        { id: 1, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 4, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 6, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    48: [
+        { id: 1, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 4, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 6, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    49: [
+        { id: 1, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 4, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 6, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    50: [
+        { id: 1, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 4, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 6, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    51: [
+        { id: 1, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 4, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 6, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    52: [
+        { id: 1, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 4, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 6, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    53: [
+        { id: 1, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 4, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 6, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    54: [
+        { id: 1, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 4, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 6, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    55: [
+        { id: 1, startR: 1, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 3, startC: 9, dir: 'L', steps: ['L', 'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L'] },
+        { id: 3, startR: 6, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 8, startC: 9, dir: 'L', steps: ['L', 'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L'] }
+    ],
+    56: [
+        { id: 1, startR: 2, startC: 1, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 2, startC: 4, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 2, startC: 6, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 2, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    57: [
+        { id: 1, startR: 1, startC: 3, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 6, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 8, startC: 2, dir: 'U', steps: ['U', 'U', 'U', 'U', 'U', 'U', 'U', 'U', 'U'] },
+        { id: 4, startR: 8, startC: 7, dir: 'U', steps: ['U', 'U', 'U', 'U', 'U', 'U', 'U', 'U', 'U'] }
+    ],
+    58: [
+        { id: 1, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 4, startC: 9, dir: 'L', steps: ['L', 'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L'] },
+        { id: 3, startR: 6, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 8, startC: 9, dir: 'L', steps: ['L', 'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L'] }
+    ],
+    59: [
+        { id: 1, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 4, startC: 9, dir: 'L', steps: ['L', 'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L'] },
+        { id: 3, startR: 6, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 8, startC: 9, dir: 'L', steps: ['L', 'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L'] }
+    ],
+    60: [
+        { id: 1, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 4, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 6, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+        61: [
+        { id: 1, startR: 0, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 4, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 6, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 5, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    62: [
+        { id: 1, startR: 1, startC: 0, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 4, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 1, startC: 6, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 5, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    63: [
+        { id: 1, startR: 1, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 3, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 5, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 7, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 5, startR: 9, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    64: [
+        { id: 1, startR: 1, startC: 1, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 3, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 5, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 1, startC: 7, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 5, startR: 1, startC: 9, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    65: [
+        { id: 1, startR: 0, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 4, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 6, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 5, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    66: [
+        { id: 1, startR: 1, startC: 0, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 4, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 1, startC: 6, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 5, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    67: [
+        { id: 1, startR: 1, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 3, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 5, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 7, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 5, startR: 9, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    68: [
+        { id: 1, startR: 1, startC: 1, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 3, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 5, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 1, startC: 7, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 5, startR: 1, startC: 9, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    69: [
+        { id: 1, startR: 0, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 4, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 6, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 5, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    70: [
+        { id: 1, startR: 1, startC: 0, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 4, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 1, startC: 6, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 5, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    71: [
+        { id: 1, startR: 1, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 3, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 5, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 7, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 5, startR: 9, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    72: [
+        { id: 1, startR: 1, startC: 1, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 3, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 5, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 1, startC: 7, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 5, startR: 1, startC: 9, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    73: [
+        { id: 1, startR: 0, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 4, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 6, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 5, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    74: [
+        { id: 1, startR: 1, startC: 0, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 4, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 1, startC: 6, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 5, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    75: [
+        { id: 1, startR: 1, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 3, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 5, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 7, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 5, startR: 9, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    76: [
+        { id: 1, startR: 1, startC: 1, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 3, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 5, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 1, startC: 7, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 5, startR: 1, startC: 9, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    77: [
+        { id: 1, startR: 0, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 4, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 6, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 5, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    78: [
+        { id: 1, startR: 1, startC: 0, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 4, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 1, startC: 6, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 5, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    79: [
+        { id: 1, startR: 1, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 3, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 5, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 7, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 5, startR: 9, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    80: [
+        { id: 1, startR: 1, startC: 1, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 3, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 5, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 1, startC: 7, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 5, startR: 1, startC: 9, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+           81: [
+        { id: 1, startR: 0, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 4, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 6, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 5, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 6, startR: 9, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    82: [
+        { id: 1, startR: 1, startC: 0, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 4, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 1, startC: 5, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 5, startR: 1, startC: 7, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 6, startR: 1, startC: 9, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    83: [
+        { id: 1, startR: 1, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 3, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 5, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 7, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 5, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 6, startR: 9, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    84: [
+        { id: 1, startR: 1, startC: 1, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 3, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 5, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 1, startC: 6, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 5, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 6, startR: 1, startC: 9, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    85: [
+        { id: 1, startR: 0, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 4, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 5, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 5, startR: 7, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 6, startR: 9, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    86: [
+        { id: 1, startR: 1, startC: 0, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 4, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 1, startC: 6, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 5, startR: 1, startC: 7, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 6, startR: 1, startC: 9, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    87: [
+        { id: 1, startR: 1, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 3, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 5, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 6, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 5, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 6, startR: 9, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    88: [
+        { id: 1, startR: 1, startC: 1, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 3, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 5, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 1, startC: 7, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 5, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 6, startR: 1, startC: 9, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    89: [
+        { id: 1, startR: 0, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 4, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 6, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 5, startR: 7, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 6, startR: 9, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+        90: [
+        { id: 1, startR: 0, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 4, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 5, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 5, startR: 7, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 6, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 7, startR: 9, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    91: [
+        { id: 1, startR: 1, startC: 0, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 4, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 1, startC: 5, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 5, startR: 1, startC: 6, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 6, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 7, startR: 1, startC: 9, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    92: [
+        { id: 1, startR: 0, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 3, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 5, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 5, startR: 6, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 6, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 7, startR: 9, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    93: [
+        { id: 1, startR: 1, startC: 0, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 4, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 1, startC: 5, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 5, startR: 1, startC: 7, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 6, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 7, startR: 1, startC: 9, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    94: [
+        { id: 1, startR: 1, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 3, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 4, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 5, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 5, startR: 7, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 6, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 7, startR: 9, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    95: [
+        { id: 1, startR: 1, startC: 1, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 3, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 4, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 1, startC: 6, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 5, startR: 1, startC: 7, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 6, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 7, startR: 1, startC: 9, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    96: [
+        { id: 1, startR: 0, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 2, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 4, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 5, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 5, startR: 6, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 6, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 7, startR: 9, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    97: [
+        { id: 1, startR: 1, startC: 0, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 2, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 3, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 1, startC: 5, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 5, startR: 1, startC: 6, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 6, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 7, startR: 1, startC: 9, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    98: [
+        { id: 1, startR: 1, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 3, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 5, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 6, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 5, startR: 7, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 6, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 7, startR: 9, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+    99: [
+        { id: 1, startR: 1, startC: 1, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 2, startR: 1, startC: 3, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 3, startR: 1, startC: 4, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 4, startR: 1, startC: 5, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 5, startR: 1, startC: 7, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 6, startR: 1, startC: 8, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] },
+        { id: 7, startR: 1, startC: 9, dir: 'D', steps: ['D', 'D', 'D', 'D', 'D', 'D', 'D', 'D', 'D'] }
+    ],
+    100: [
+        { id: 1, startR: 0, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 2, startR: 1, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 3, startR: 3, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 4, startR: 5, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 5, startR: 6, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 6, startR: 8, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] },
+        { id: 7, startR: 9, startC: 1, dir: 'R', steps: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] }
+    ],
+};
+
+
+
+// Tasodifiy generator olib tashlandi, faqat siz yozgan bosqichlarni aniq yuklaydi
+function generateLevelData(lvl) {
+    if (levelPaths[lvl]) {
+        return levelPaths[lvl];
+    }
+    // Agar o'yinchi hali o'zingiz yozmagan levelga yetsa, xato bermasligi uchun 1-levelni qaytaradi
+    return levelPaths[1]; 
+}
+
+// Maydonni yangilash va chizish
+function initGame() {
+    isAnimating = false;
+    hudLeft.innerText = `🧩 Daraja: ${currentLevel} / 100`;
+
+    let levelData = generateLevelData(currentLevel);
+
+    board.style.gridTemplateColumns = `repeat(${gridCols}, 1fr)`;
+    board.style.gridTemplateRows = `repeat(${gridRows}, 1fr)`;
+    board.innerHTML = '';
+
+    gridMatrix = Array(gridRows).fill().map(() => Array(gridCols).fill(0));
+    activeArrowsCount = levelData.length;
+
+    // Nuqtalarni o'rnatish
+    for (let r = 0; r < gridRows; r++) {
+        gridMatrix[r] = [];
+        for (let c = 0; c < gridCols; c++) {
+            gridMatrix[r][c] = 0;
+
+            const dotContainer = document.createElement('div');
+            dotContainer.className = 'dot-container';
+            dotContainer.id = `cell-${r}-${c}`;
+            
+            const dot = document.createElement('div');
+            dot.className = 'grid-dot';
+            dotContainer.appendChild(dot);
+            board.appendChild(dotContainer);
+        }
+    }
+
+    // Strelkalarni saf bo'yicha chizish
+    levelData.forEach(arrow => {
+        const startCell = document.getElementById(`cell-${arrow.startR}-${arrow.startC}`);
+        if (startCell) {
+            const dot = startCell.querySelector('.grid-dot');
+            if (dot) dot.style.opacity = '0'; 
+
+            const arrowEl = document.createElement('div');
+            arrowEl.className = `arrow-item ${arrow.dir.toLowerCase()}`;
+            arrowEl.innerHTML = '➔';
+            
+            arrowEl.onclick = (e) => {
+                e.stopPropagation();
+                drawArrowPath(arrow);
+            };
+            startCell.appendChild(arrowEl);
+            gridMatrix[arrow.startR][arrow.startC] = 2; 
+        }
+    });
+}
+
+// Kataklarni to'liq qoplovchi chizish mexanikasi
+function drawArrowPath(arrow) {
+    if (isAnimating) return;
+    
+    let currentR = arrow.startR;
+    let currentC = arrow.startC;
+    let pathCells = [];
+    let canComplete = true;
+
+    for (let i = 0; i < arrow.steps.length; i++) {
+        const stepDir = arrow.steps[i];
+        if (stepDir === 'R') currentC++;
+        else if (stepDir === 'L') currentC--;
+        else if (stepDir === 'U') currentR--;
+        else if (stepDir === 'D') currentR++;
+
+        if (currentR < 0 || currentR >= gridRows || currentC < 0 || currentC >= gridCols) {
+            break; 
+        }
+
+        if (gridMatrix[currentR][currentC] > 0) {
+            canComplete = false;
+            break;
+        }
+        pathCells.push({ r: currentR, c: currentC });
+    }
+
+    if (canComplete) {
+        isAnimating = true;
+        
+        const startCell = document.getElementById(`cell-${arrow.startR}-${arrow.startC}`);
+        const arrowEl = startCell.querySelector('.arrow-item');
+        if (arrowEl) arrowEl.remove();
+        
+        const startLine = document.createElement('div');
+        startLine.className = 'path-line';
+        startCell.appendChild(startLine);
+        gridMatrix[arrow.startR][arrow.startC] = 1;
+
+        pathCells.forEach((cell, index) => {
+            setTimeout(() => {
+                const cellEl = document.getElementById(`cell-${cell.r}-${cell.c}`);
+                if (cellEl) {
+                    const dot = cellEl.querySelector('.grid-dot');
+                    if (dot) dot.style.opacity = '0';
+
+                    const blockSegment = document.createElement('div');
+                    blockSegment.className = 'path-line';
+                    cellEl.appendChild(blockSegment);
+                    gridMatrix[cell.r][cell.c] = 1;
+                }
+                if (index === pathCells.length - 1) {
+                    isAnimating = false;
+                    activeArrowsCount--;
+                    checkGameStatus();
+                }
+            }, index * 60);
+        });
+    } else {
+        isAnimating = true;
+        const startCell = document.getElementById(`cell-${arrow.startR}-${arrow.startC}`);
+        const arrowEl = startCell.querySelector('.arrow-item');
+        if (arrowEl) {
+            arrowEl.classList.add('shake-error');
+            setTimeout(() => {
+                arrowEl.classList.remove('shake-error');
+                isAnimating = false;
+            }, 300);
+        }
+    }
+}
+
+// Bosqich tugaganini tekshirish
+function checkGameStatus() {
+    if (activeArrowsCount <= 0) {
+        setTimeout(() => {
+            showModal(`Bosqich ${currentLevel} Yakunlandi! 🎉`, "Mantiqiy zanjirni to'g'ri topdingiz. Keyingi darajaga o'tamiz.", "Davom etish");
+        }, 300);
+    }
+}
+
+// Kod to'liq yuklangach o'yinni boshlash
+window.onload = function() {
+    initGame();
+};
+
+    </script>
+</body>
+</html>

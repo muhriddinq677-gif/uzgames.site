@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <title>Tank Party </title>
+    <style>
+        /* --- CSS QISMI: DIZAYN VA KO'RINISH --- */
+        * { box-sizing: border-box; touch-action: none; user-select: none; }
+        body { margin: 0; background: #000; overflow: hidden; font-family: 'Arial Black', sans-serif; color: white; }
+        .page { display: none; width: 100vw; height: 100vh; flex-direction: column; align-items: center; justify-content: center; position: absolute; }
+        .active { display: flex; }
+        #homePage, #shopPage { background: radial-gradient(circle, #1a2a1a 0%, #000 100%); }
+        .btn-main { padding: 12px 25px; font-size: 1rem; border-radius: 12px; cursor: pointer; background: #f1c40f; color: #000; border: 4px solid #d4ac0d; margin: 5px; box-shadow: 0 4px #917508; }
+        .shop-grid { width: 95%; height: 75%; background: rgba(0,0,0,0.9); border-radius: 15px; overflow-y: auto; padding: 15px; display: grid; grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)); gap: 10px; border: 2px solid gold; }
+        .item-card { background: #222; border: 1px solid #444; border-radius: 10px; padding: 8px; text-align: center; }
+        .preview-canvas { width: 70px; height: 70px; background: #333; border-radius: 5px; margin: 0 auto 5px; display: block; }
+        .assign-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; margin-top: 5px; }
+        .assign-btn { font-size: 9px; padding: 4px; cursor: pointer; background: #444; color: white; border: 1px solid #666; border-radius: 3px; }
+        canvas { background: #2e7d32; border: 10px solid #3e2723; border-radius: 8px; max-width: 95%; max-height: 80vh; }
+        .joystick { position: fixed; display: grid; grid-template-columns: repeat(3, 45px); gap: 5px; z-index: 1000; background: rgba(0,0,0,0.4); padding: 5px; border-radius: 10px; }
+        #p1-ctrl { bottom: 10px; left: 10px; } #p2-ctrl { bottom: 10px; right: 10px; }
+        #p3-ctrl { top: 65px; left: 10px; } #p4-ctrl { top: 65px; right: 10px; }
+        .j-btn { width: 45px; height: 45px; background: rgba(255,255,255,0.1); border: 1px solid #fff; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; }
+        .coins-info { position: fixed; top: 10px; right: 10px; color: gold; font-size: 1.2rem; background: rgba(0,0,0,0.7); padding: 5px 15px; border-radius: 10px; border: 1px solid gold; z-index: 2000; }
+    </style>
+</head>
+<body>
+
+    <div class="coins-info">💰 <span id="balance">0</span></div>
+
+    <!-- SAHIFALAR BLOKI -->
+    <div id="homePage" class="page active">
+        <h1 style="color:#f1c40f; text-shadow:3px 3px #000; font-size: 3.5rem;">TANK GAME</h1>
+        <select id="playerSelect" style="padding:10px; margin-bottom:15px; border-radius:10px; width:220px; background:#333; color:white;">
+            <option value="1">1 O'yinchi vs AI</option>
+            <option value="2">2 O'yinchi</option>
+            <option value="3">3 O'yinchi</option>
+            <option value="4">4 O'yinchi</option>
+        </select>
+        <button class="btn-main" onclick="openPage('gamePage', initGame)">PLAY</button>
+        <button class="btn-main" style="background:#3498db;" onclick="openPage('shopPage', loadShop)">SHOP (Do'kon)</button>
+    </div>
+
+    <div id="shopPage" class="page">
+        <div class="shop-grid" id="shopItems"></div>
+        <button class="btn-main" onclick="openPage('homePage')">MENU</button>
+    </div>
+
+    <div id="gamePage" class="page">
+        <button style="position:absolute; top:5px; background:red; color:white; z-index:3000; padding:8px; border-radius: 5px; border:none;" onclick="location.reload()">EXIT</button>
+        <canvas id="gameCanvas"></canvas>
+        
+        <!-- MOBIL BOSHQARUV PANELARI -->
+        <div id="p1-ctrl" class="joystick" style="display:none"><div></div><div class="j-btn" onpointerdown="mv('p1','up')" onpointerup="st('p1')">W</div><div></div><div class="j-btn" onpointerdown="mv('p1','left')" onpointerup="st('p1')">A</div><div class="j-btn" onpointerdown="mv('p1','down')" onpointerup="st('p1')">S</div><div class="j-btn" onpointerdown="mv('p1','right')" onpointerup="st('p1')">D</div><div class="j-btn" style="background:red" onpointerdown="fr('p1')">Q</div></div>
+        <div id="p2-ctrl" class="joystick" style="display:none"><div></div><div class="j-btn" onpointerdown="mv('p2','up')" onpointerup="st('p2')">↑</div><div></div><div class="j-btn" onpointerdown="mv('p2','left')" onpointerup="st('p2')">←</div><div class="j-btn" onpointerdown="mv('p2','down')" onpointerup="st('p2')">↓</div><div class="j-btn" onpointerdown="mv('p2','right')" onpointerup="st('p2')">→</div><div class="j-btn" style="background:cyan;color:#000" onpointerdown="fr('p2')">ENT</div></div>
+        <div id="p3-ctrl" class="joystick" style="display:none"><div></div><div class="j-btn" onpointerdown="mv('p3','up')" onpointerup="st('p3')">I</div><div></div><div class="j-btn" onpointerdown="mv('p3','left')" onpointerup="st('p3')">J</div><div class="j-btn" onpointerdown="mv('p3','down')" onpointerup="st('p3')">K</div><div class="j-btn" onpointerdown="mv('p3','right')" onpointerup="st('p3')">L</div><div class="j-btn" style="background:lime;color:#000" onpointerdown="fr('p3')">U</div></div>
+        <div id="p4-ctrl" class="joystick" style="display:none"><div></div><div class="j-btn" onpointerdown="mv('p4','up')" onpointerup="st('p4')">T</div><div></div><div class="j-btn" onpointerdown="mv('p4','left')" onpointerup="st('p4')">F</div><div class="j-btn" onpointerdown="mv('p4','down')" onpointerup="st('p4')">G</div><div class="j-btn" onpointerdown="mv('p4','right')" onpointerup="st('p4')">H</div><div class="j-btn" style="background:yellow;color:#000" onpointerdown="fr('p4')">R</div></div>
+    </div>
+
+    <script>
+        /* =========================================
+           1. MA'LUMOTLAR OMBORI (DATA)
+        ========================================= */
+        let save = JSON.parse(localStorage.getItem('tank_final_pro')) || {
+            coins: 1000, inventory: ['t1','c1','f1'],
+            pS: { p1t:'t1', p1c:'c1', p1f:'f1', p2t:'t1', p2c:'c1', p2f:'f1', p3t:'t1', p3c:'c1', p3f:'f1', p4t:'t1', p4c:'c1', p4f:'f1' }
+        };
+
+        // Do'kon buyumlari
+        const shapes = Array.from({length:10}, (_,i)=>({id:'t'+(i+1), n:'Shakl '+(i+1), p:300}));
+        const colors = [{id:'c1',v:'red',p:100},{id:'c2',v:'cyan',p:100},{id:'c3',v:'lime',p:100},{id:'c4',v:'yellow',p:100},{id:'c5',v:'gold',p:100},{id:'c6',v:'#f40',p:100},{id:'c7',v:'#f0f',p:100},{id:'c8',v:'#ccc',p:100},{id:'c9',v:'#444',p:100},{id:'c10',v:'#fff',p:100}];
+        const flags = [{id:'f1',n:'None',p:0,v:null},
+{
+  id: 'f2',
+  n: 'UZB',
+  p: 500,
+  // Ranglar: Moviy, Qizil, Oq, Qizil, Yashil
+  v: ['#0099B5', '#D21034', '#FFFFFF', '#D21034', '#059033'],
+  // Balandlik ulushi: Qizilni 1 qildim (eng ingichka holati)
+ // Mana ideal variant:
+// Bu proportsiya bayroqni aniq va chiroyli chiqaradi:
+h: [10, 0.5, 10, 0.5, 10],
+  // Oy va 12 yulduz (oq rangda, yuqori chapda)
+  s: {
+    type: 'uzb', 
+    color: 'white',
+    size: 20,
+    pos: 'top_left'
+  }
+}
+
+,
+{id:'f3',n:'RUS',p:500,v:['#FFF','#0052A5','#D52B1E']},{id:'f4',n:'ENG',p:500,v:['#FFF','#CE1126','#FFF']},{id:'f5',n:'TUR',p:500,v:['#E30A17','#FFF']},{id:'f6',n:'POR',p:500,v:['#006600','#FF0000']},{id:'f7',n:'BRA',p:500,v:['#009739','#FEDF00','#012169']},{id:'f8',n:'ARG',p:500,v:['#74ACDF','#FFF','#74ACDF']},{id:'f9',n:'MOR',p:500,v:['#C1272D','#006233']},{id:'f10',n:'ARA',p:500,v:['#006C35','#FFF']},{id:'f11',n:'FRA',p:500,v:['#0055A4','#FFF','#EF4135']}];
+
+        function sync() { localStorage.setItem('tank_final_pro', JSON.stringify(save)); document.getElementById('balance').innerText = save.coins; }
+        function openPage(id, cb) { document.querySelectorAll('.page').forEach(p=>p.classList.remove('active')); document.getElementById(id).classList.add('active'); if(cb) cb(); sync(); }
+
+        /* =========================================
+           2. SHAKLLARNI CHIZISH (TANK SKINS)
+        ========================================= */
+        function drawTank(ctx, x, y, angle, colorVal, skinId, flagId) {
+            ctx.save(); ctx.translate(x, y); ctx.rotate(angle);
+            ctx.fillStyle = colorVal; ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5;
+
+            // SHAKLLARNI TANLASH LOGIKASI
+            if(skinId==='t1') ctx.fillRect(-18,-15,36,30);
+            else if(skinId==='t2'){ ctx.fillRect(-18,-15,36,30); ctx.fillStyle='#000'; ctx.fillRect(-20,-18,40,5); ctx.fillRect(-20,13,40,5); }
+            else if(skinId==='t3'){ ctx.beginPath(); for(let i=0;i<6;i++) ctx.lineTo(20*Math.cos(i*Math.PI/3), 20*Math.sin(i*Math.PI/3)); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+            else if(skinId==='t4'){ ctx.beginPath(); ctx.arc(0,0,18,0,7); ctx.fill(); ctx.stroke(); }
+            else if(skinId==='t5'){ ctx.beginPath(); ctx.moveTo(-18,-18); ctx.lineTo(22,0); ctx.lineTo(-18,18); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+            else if(skinId==='t6'){ ctx.fillRect(-20,-12,40,24); ctx.strokeRect(-12,-18,24,36); }
+            else if(skinId==='t7'){ ctx.fillRect(-15,-15,30,30); ctx.fillStyle='#fff'; ctx.fillRect(-5,-5,10,10); }
+            else if(skinId==='t8'){ ctx.beginPath(); ctx.moveTo(-20,0); ctx.lineTo(0,-20); ctx.lineTo(20,0); ctx.lineTo(0,20); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+            else if(skinId==='t9'){ ctx.fillRect(-18,-15,36,30); ctx.strokeRect(-10,-10,20,20); }
+            else { ctx.fillRect(-16,-16,32,32); ctx.strokeRect(-20,-20,40,40); }
+
+            // BAYROQLAR
+            let flag = flags.find(f=>f.id===flagId);
+            if(flag && flag.v){ ctx.globalAlpha=0.7; let fv=flag.v; for(let i=0;i<fv.length;i++){ ctx.fillStyle=fv[i]; ctx.fillRect(-12,-12+(i*(24/fv.length)), 24, 24/fv.length); } ctx.globalAlpha=1; }
+            ctx.fillStyle="#555"; if(!['t2','t5'].includes(skinId)) ctx.fillRect(10,-3,22,6); ctx.restore();
+        }
+
+        /* =========================================
+           3. DO'KON QISMI (SHOP & SWAP)
+        ========================================= */
+        function loadShop() {
+            const grid = document.getElementById('shopItems'); grid.innerHTML = '';
+            const render = (title, data, type) => {
+                grid.innerHTML += `<h3 style="grid-column:1/-1; color:gold; border-bottom:1px solid gold; margin-top:15px;">${title}</h3>`;
+                data.forEach(item => {
+                    let own = save.inventory.includes(item.id);
+                    // P1-P4 TUGMALARI (TUG'RILANGAN)
+                    grid.innerHTML += `<div class="item-card"><canvas id="c_${item.id}" class="preview-canvas" width="70" height="70"></canvas>
+                    <div style="font-size:10px; color:gold;">${own?'EGALANGAN':item.p+' 💰'}</div>
+                    ${own?`<div class="assign-btns">${[1,2,3,4].map(n=>`<button class="assign-btn" onclick="assign('${type}','${item.id}','p${n}')">P${n}</button>`).join('')}</div>`:`<button class="btn-main" style="width:100%; font-size:10px;" onclick="swapBuy('${item.id}',${item.p},'${type}')">BUY</button>`}</div>`;
+                    setTimeout(()=>{ let cnv = document.getElementById(`c_${item.id}`); if(cnv) drawTank(cnv.getContext('2d'),35,35,0,(type==='c'?item.v:'gold'),(type==='t'?item.id:'t1'),(type==='f'?item.id:'f1')); },50);
+                });
+            };
+            render("SHAKLLAR (300)", shapes, 't'); 
+            render("RANGLAR (100)", colors, 'c'); 
+            render("BAYROQLAR (500)", flags, 'f');
+        }
+
+        // SWAP BUY: FAQAT BITTA OCHIQ JOY QOLADI (TUG'RILANGAN)
+        function swapBuy(id, price, type) {
+            if(save.coins < price) { alert("Pul yetarli emas!"); return; }
+            // Inventarni tozalash (eski olinganlarni o'chiradi)
+            save.inventory = save.inventory.filter(item => !item.startsWith(type));
+            save.coins -= price; 
+            save.inventory.push(id); 
+            sync(); 
+            loadShop();
+        }
+
+        function assign(type,id,p){ save.pS[p+type]=id; sync(); alert(p.toUpperCase() + " yangilandi!"); }
+
+        /* =========================================
+           4. O'YIN MANTIG'I (GAME LOOP & OCHKO)
+        ========================================= */
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let tanks = [], bullets = [], walls = [], gameRunning = false;
+
+        function initGame() {
+            canvas.width = 900; canvas.height = 700; tanks = []; bullets = [];
+            let n = parseInt(document.getElementById('playerSelect').value);
+            const pos = [{x:80,y:620,a:-Math.PI/2,id:'p1'},{x:820,y:620,a:-Math.PI/2,id:'p2'},{x:80,y:80,a:Math.PI/2,id:'p3'},{x:820,y:80,a:Math.PI/2,id:'p4'}];
+            for(let i=0;i<4;i++){
+                document.getElementById(`p${i+1}-ctrl`).style.display = i<n?'grid':'none';
+                if(i<n) {
+                    let cId = save.pS['p'+(i+1)+'c'] || 'c1';
+                    let cObj = colors.find(c=>c.id===cId) || colors[0];
+                    tanks.push({...pos[i], alive:true, v:0, av:0, c:cObj.v, t:save.pS['p'+(i+1)+'t'], f:save.pS['p'+(i+1)+'f']});
+                }
+            }
+            if(n===1) tanks.push({x:820,y:80,a:Math.PI,id:'bot',alive:true,v:2,av:0,c:'orange',t:'t3',f:'f1'});
+            walls = [{x:150,y:340,w:600,h:20},{x:440,y:150,w:20,h:400},{x:60,y:240,w:150,h:20},{x:690,y:240,w:150,h:20},{x:60,y:440,w:150,h:20},{x:690,y:440,w:150,h:20}];
+            gameRunning = true; loop();
+        }
+
+        function isHit(x, y) {
+            const r = 18; if(x<r || x>882 || y<r || y>682) return true;
+            for(let w of walls) if(x>w.x-r+2 && x<w.x+w.w+r-2 && y>w.y-r+2 && y<w.y+w.h+r-2) return true;
+            return false;
+        }
+
+        function mv(id,d){ let t=tanks.find(x=>x.id===id); if(t){ if(d==='up')t.v=4.5; if(d==='down')t.v=-3.5; if(d==='left')t.av=-0.08; if(d==='right')t.av=0.08; } }
+        function st(id){ let t=tanks.find(x=>x.id===id); if(t){ t.v=0; t.av=0; } }
+        function fr(id){ let t=tanks.find(x=>x.id===id); if(t&&t.alive) bullets.push({x:t.x+Math.cos(t.a)*32,y:t.y+Math.sin(t.a)*32,vx:Math.cos(t.a)*9,vy:Math.sin(t.a)*9,owner:id,life:90}); }
+
+        function loop() {
+            if(!gameRunning) return;
+            ctx.fillStyle="#1b5e20"; ctx.fillRect(0,0,900,700);
+            ctx.fillStyle="#fff"; walls.forEach(w=>ctx.fillRect(w.x,w.y,w.w,w.h));
+            
+            tanks.forEach(t => {
+                if(!t.alive) return;
+                if(t.id==='bot'){ 
+                    if(Math.random()<0.05) t.av=(Math.random()-0.5)*0.2; 
+                    let nx=t.x+Math.cos(t.a)*t.v, ny=t.y+Math.sin(t.a)*t.v; 
+                    if(!isHit(nx,ny)){t.x=nx;t.y=ny;}else{t.a+=Math.PI/2;} 
+                    t.a+=t.av; if(Math.random()<0.02) fr('bot'); 
+                } else { 
+                    let nx=t.x+Math.cos(t.a)*t.v, ny=t.y+Math.sin(t.a)*t.v; 
+                    if(!isHit(nx,ny)){t.x=nx;t.y=ny;} t.a+=t.av; 
+                }
+                drawTank(ctx,t.x,t.y,t.a,t.c,t.t,t.f);
+            });
+
+            bullets.forEach((b,i)=>{
+                b.x+=b.vx; b.y+=b.vy; b.life--; ctx.fillStyle="yellow"; ctx.beginPath(); ctx.arc(b.x,b.y,4,0,7); ctx.fill();
+                tanks.forEach(t=>{ if(t.alive && t.id!==b.owner && Math.hypot(t.x-b.x,t.y-b.y)<22){ 
+                    t.alive = false; bullets.splice(i,1); 
+                    // BU YERDA OCHKO: 10 QO'SHILADI (TUG'RILANGAN)
+                    if(b.owner.startsWith('p')){ save.coins += 10; sync(); } 
+                } });
+                if(b.life<=0 || isHit(b.x,b.y)) bullets.splice(i,1);
+            });
+            if(tanks.filter(t=>t.alive).length<=1 && tanks.length>0){ gameRunning=false; setTimeout(()=>{alert("O'YIN TUGADI!"); openPage('homePage');},500); }
+            requestAnimationFrame(loop);
+        }
+
+        /* --- KLAVIATURA BOSHQARUVI (P1-P4 TO'LIQ) --- */
+        const kMap = {
+            'KeyW':['p1','up'],'KeyS':['p1','down'],'KeyA':['p1','left'],'KeyD':['p1','right'],'KeyQ':['p1','fire'],
+            'ArrowUp':['p2','up'],'ArrowDown':['p2','down'],'ArrowLeft':['p2','left'],'ArrowRight':['p2','right'],'Enter':['p2','fire'],
+            'KeyI':['p3','up'],'KeyK':['p3','down'],'KeyJ':['p3','left'],'KeyL':['p3','right'],'KeyU':['p3','fire'],
+            'KeyT':['p4','up'],'KeyG':['p4','down'],'KeyF':['p4','left'],'KeyH':['p4','right'],'KeyR':['p4','fire']
+        };
+        window.onkeydown=(e)=>{ let v=kMap[e.code]; if(v) v[1]==='fire'?fr(v[0]):mv(v[0],v[1]); };
+        window.onkeyup=(e)=>{ let v=kMap[e.code]; if(v && v[1]!=='fire') st(v[0]); };
+        sync();
+    </script>
+</body>
+</html>

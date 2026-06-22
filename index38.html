@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gapiruvchi Tom - Haqiqiy Mikrofon</title>
+    <!-- CSS KODINI SHU YERGA (STYLE ICHIGA) JOYLASHTIRING -->
+    <style>
+     :root {
+    --gold: #ffcc00;
+    --green: #00ff66;
+    --blue: #00ccff;
+}
+* { box-sizing: border-box; }
+body, html {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; font-family: 'Segoe UI', Roboto, sans-serif;
+    background-color: #111; user-select: none;
+}
+
+.game-screen {
+    position: relative; width: 100%; height: 100%;
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 20px; transition: background 0.4s ease;
+    background-size: cover; background-position: center;
+}
+
+.room-living { background: radial-gradient(circle, #34495e, #2c3e50); }
+.room-kitchen { background: radial-gradient(circle, #d35400, #e67e22); }
+.room-bathroom { background: radial-gradient(circle, #2980b9, #3498db); }
+.room-bedroom { background: radial-gradient(circle, #2c3e50, #1a252f); }
+.room-dark { background: #070a0f !important; }
+
+.top-hud {
+    width: 100%; max-width: 500px; display: flex;
+    justify-content: space-between; align-items: center; z-index: 10; margin: 0 auto;
+}
+.coin-box {
+    background: rgba(0, 0, 0, 0.6); padding: 8px 15px;
+    border-radius: 20px; font-weight: bold; font-size: 1.2rem;
+    color: var(--gold); display: flex; align-items: center; gap: 5px;
+}
+.open-shop-btn {
+    background: rgba(0, 0, 0, 0.6); border: 2px solid var(--blue);
+    color: var(--blue); font-size: 1.4rem; width: 45px; height: 45px;
+    border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+
+.cat-container {
+    position: absolute; top: 48%; left: 50%;
+    transform: translate(-50%, -50%); display: flex;
+    flex-direction: column; align-items: center; transition: all 0.3s ease;
+}
+.cat-hat { font-size: 4.5rem; height: 70px; margin-bottom: -20px; z-index: 5; pointer-events: none; }
+.cat-face { font-size: 9.5rem; line-height: 1; transition: transform 0.15s ease; cursor: pointer; }
+
+/* Listening rejimida pulsatsiya animatsiyasi */
+.listening-mode {
+    animation: mic-pulse 1.5s infinite;
+}
+@keyframes mic-pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.speech-bubble {
+    position: absolute; top: -65px; background: #fff;
+    color: #000; padding: 10px 20px; border-radius: 20px;
+    font-weight: bold; font-size: 1rem; display: none;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3); white-space: nowrap; z-index: 20;
+}
+.speech-bubble::after {
+    content: ''; position: absolute; bottom: -10px; left: 50%;
+    transform: translateX(-50%); border-width: 10px 10px 0;
+    border-style: solid; border-color: #fff transparent;
+}
+
+.kitchen-table { display: none; position: absolute; bottom: 120px; width: 340px; height: 55px; background: #8e24aa; border-radius: 12px; justify-content: space-around; align-items: center; padding: 0 10px; box-shadow: 0 6px 15px rgba(0,0,0,0.4); left: 50%; transform: translateX(-50%); }
+.food-item { font-size: 2.3rem; cursor: pointer; transition: transform 0.1s; }
+.food-item:active { transform: scale(1.4); }
+
+.bathroom-shower { display: none; position: absolute; top: 80px; font-size: 3.5rem; cursor: pointer; left: 50%; transform: translateX(-50%); z-index: 8; text-align: center; }
+.water-drops { display: none; position: absolute; top: 140px; font-size: 2.8rem; animation: rain 0.4s infinite linear; pointer-events: none; left: 50%; transform: translateX(-50%); z-index: 7; text-align: center; width: 120px; }
+
+.bedroom-lamp { display: none; position: absolute; top: 80px; font-size: 3.2rem; cursor: pointer; left: 50%; transform: translateX(-50%); z-index: 8; }
+.bedroom-bed { display: none; position: absolute; bottom: 90px; width: 240px; height: 75px; background: #e91e63; border-radius: 8px 8px 0 0; box-shadow: 0 5px 12px rgba(0,0,0,0.3); left: 50%; transform: translateX(-50%); border-top: 15px solid #fff; z-index: 3; }
+
+@keyframes rain { 0% { transform: translateY(0) translateX(-50%); opacity: 1; } 100% { transform: translateY(50px) translateX(-50%); opacity: 0; } }
+
+.bottom-navigation {
+    width: 100%; max-width: 450px; display: flex;
+    justify-content: space-around; margin: 0 auto 15px auto; z-index: 10;
+}
+.nav-btn {
+    background: rgba(255, 255, 255, 0.9); border: 3px solid #7f8c8d;
+    width: 65px; height: 65px; border-radius: 50%;
+    font-size: 1.8rem; cursor: pointer; display: flex;
+    align-items: center; justify-content: center;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    transition: background 0.2s, transform 0.1s; -webkit-tap-highlight-color: transparent;
+}
+.nav-btn.active { background: var(--blue); border-color: #2980b9; transform: scale(1.08); }
+.nav-btn:active { transform: scale(0.95); }
+
+.shop-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+.shop-modal { background: #34495e; border: 3px solid #1a252f; width: 100%; max-width: 400px; border-radius: 15px; padding: 20px; }
+.shop-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1a252f; padding-bottom: 10px; margin-bottom: 15px; }
+.shop-title { font-size: 1.3rem; font-weight: bold; color: var(--gold); }
+.close-shop-btn { background: #e74c3c; border: none; color: #fff; font-weight: bold; padding: 5px 12px; border-radius: 5px; cursor: pointer; }
+.shop-section-title { font-size: 0.9rem; color: var(--blue); font-weight: bold; margin: 15px 0 5px 0; }
+.shop-item { display: flex; justify-content: space-between; align-items: center; background: #2c3e50; padding: 10px; margin: 8px 0; border-radius: 8px; border: 1px solid #1a252f; }
+.buy-btn { padding: 6px 12px; font-size: 0.85rem; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; background: var(--gold); color: #000; }
+.use-btn { padding: 6px 12px; font-size: 0.85rem; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; background: var(--green); color: #000; }
+
+    </style>
+</head>
+<body>
+
+    <div class="game-screen room-living" id="main-screen">
+        
+        <!-- Tepadagi panel (Hamyon va Do'kon) -->
+        <div class="top-hud">
+            <div class="coin-box"><span id="coin-display">40</span> 🪙</div>
+            <button class="open-shop-btn" onclick="toggleShop(true)">🛒</button>
+        </div>
+
+        <!-- OSHXONA: Ko'p ovqatli stol -->
+        <div class="kitchen-table" id="kitchen-furniture">
+            <div class="food-item" onclick="feedTom('🍔')">🍔</div>
+            <div class="food-item" onclick="feedTom('🍕')">🍕</div>
+            <div class="food-item" onclick="feedTom('🍎')">🍎</div>
+            <div class="food-item" onclick="feedTom('🍉')">🍉</div>
+            <div class="food-item" onclick="feedTom('🍦')">🍦</div>
+            <div class="food-item" onclick="feedTom('🍹')">🍹</div>
+        </div>
+
+        <!-- VANNA: Dush va Sovun -->
+        <div class="bathroom-shower" id="shower-item" onclick="toggleShower()">🧼</div>
+        <div class="water-drops" id="water-drops">💧💧<br>💧💧</div>
+
+        <!-- YOTOQXONA: Karavot va chiroq -->
+        <div class="bedroom-lamp" id="lamp-item" onclick="toggleLight()">💡</div>
+        <div class="bedroom-bed" id="bed-furniture"></div>
+
+        <!-- Tom Ob'ekti (Markazda) -->
+        <div class="cat-container" id="tom-container">
+            <div class="speech-bubble" id="chat-bubble">Eshityapman...</div>
+            <div class="cat-hat" id="cat-hat-slot"></div>
+            <div class="cat-face" id="cat-face-slot" onclick="hitTom()">🐱</div>
+        </div>
+
+        <!-- Pastki xonalarga o'tish paneli -->
+        <div class="bottom-navigation">
+            <button class="nav-btn active" id="nav-speak" onclick="changeRoom('living')">🎙️</button>
+            <button class="nav-btn" id="nav-kitchen" onclick="changeRoom('kitchen')">🍽️</button>
+            <button class="nav-btn" id="nav-bathroom" onclick="changeRoom('bathroom')">🧼</button>
+            <button class="nav-btn" id="nav-bedroom" onclick="changeRoom('bedroom')">💤</button>
+        </div>
+
+    </div>
+
+    <!-- Do'kon (Popup modal) -->
+    <div class="shop-overlay" id="shop-overlay">
+        <div class="shop-modal">
+            <div class="shop-header">
+                <div class="shop-title">Tom Do'koni</div>
+                <button class="close-shop-btn" onclick="toggleShop(false)">X</button>
+            </div>
+            
+            <div class="shop-section-title">Shapkalar (90 🪙)</div>
+            <div class="shop-item"><span>🤠 Kovboy Shapkasi</span><button class="buy-btn" id="b-hat1" onclick="buyItem('hat', '🤠', 'hat1', 90)">Sotib olish</button></div>
+            <div class="shop-item"><span>👑 Qirol Toji</span><button class="buy-btn" id="b-hat2" onclick="buyItem('hat', '👑', 'hat2', 90)">Sotib olish</button></div>
+            
+            <div class="shop-section-title">Kalla / Ko'rinish (100 🪙)</div>
+            <div class="shop-item"><span>🤖 Robot Tom</span><button class="buy-btn" id="b-head1" onclick="buyItem('head', '🤖', 'head1', 100)">Sotib olish</button></div>
+            <div class="shop-item"><span>👽 Alien Tom</span><button class="buy-btn" id="b-head2" onclick="buyItem('head', '👽', 'head2', 100)">Sotib olish</button></div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT KODINI SHU YERGA (SCRIPT ICHIGA) JOYLASHTIRING -->
+    <script>
+    let coins = 40;
+let currentRoom = 'living';
+let isSleeping = false;
+let isShowering = false;
+let isSpeakingNow = false;
+
+let inventory = { hat1: false, hat2: false, head1: false, head2: false };
+let equippedHat = '';
+let equippedHead = '🐱';
+
+const screen = document.getElementById('main-screen');
+const catFace = document.getElementById('cat-face-slot');
+const catContainer = document.getElementById('tom-container');
+const chatBubble = document.getElementById('chat-bubble');
+
+// MIKROFON ORQALI ESHITISH TIZIMI
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition;
+
+if (SpeechRecognition) {
+    recognition = new SpeechRecognition();
+    recognition.lang = 'uz-UZ'; // O'zbekcha nutqni taniydi
+    recognition.continuous = false; // Bitta gap eshitgach to'xtaydi
+    recognition.interimResults = false;
+
+    recognition.onstart = () => {
+        if (currentRoom !== 'living' || isSleeping || isSpeakingNow) {
+            recognition.stop();
+            return;
+        }
+        chatBubble.style.display = 'block';
+        chatBubble.innerText = 'Eshityapman... 🎙️';
+        catFace.innerText = '👂'; // Qulog'ini ding qiladi
+        catContainer.classList.add('listening-mode');
+    };
+
+    recognition.onresult = (event) => {
+        let textResult = event.results[0][0].transcript;
+        chatBubble.innerText = `Siz: "${textResult}"`;
+        isSpeakingNow = true;
+        
+        setTimeout(() => {
+            tomSpeak(textResult);
+        }, 500);
+    };
+
+    recognition.onend = () => {
+        catContainer.classList.remove('listening-mode');
+        // Agar Tom gapirmayotgan bo'lsa va mehmonxonada bo'lsa, mikrofonni qayta yoqadi (Avtomat loop)
+        setTimeout(() => {
+            if (currentRoom === 'living' && !isSleeping && !isSpeakingNow && document.getElementById('shop-overlay').style.display !== 'flex') {
+                try { recognition.start(); } catch(e) {}
+            }
+        }, 400);
+    };
+
+    recognition.onerror = (e) => {
+        catContainer.classList.remove('listening-mode');
+    };
+}
+
+// Avtomatik eshitishni faollashtirish (Mehmonxonaga kirganda)
+function startVoice() {
+    if (recognition && currentRoom === 'living' && !isSleeping && !isSpeakingNow) {
+        try { recognition.start(); } catch(e) {}
+    }
+}
+
+function tomSpeak(text) {
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel(); 
+        
+        let utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'uz-UZ';
+        utterance.pitch = 2.2; // Ovozni original Tom kabi juda ingichka qiladi
+        utterance.rate = 1.35; // Tezlashtiradi
+        
+        utterance.onstart = () => {
+            catFace.innerText = '😮'; // Og'zini ochadi
+            chatBubble.innerText = `Tom: "${text}"`;
+        };
+        
+        utterance.onend = () => {
+            isSpeakingNow = false;
+            resetTomFace();
+            chatBubble.style.display = 'none';
+            coins += 5;
+            document.getElementById('coin-display').innerText = coins;
+            startVoice(); // Gapirib bo'lgach, yana mikrofonni ochadi
+        };
+
+        utterance.onerror = () => {
+            isSpeakingNow = false;
+            resetTomFace();
+            startVoice();
+        };
+        
+        window.speechSynthesis.speak(utterance);
+    } else {
+        isSpeakingNow = false;
+        startVoice();
+    }
+}
+
+// Xonalar boshqaruvi
+function changeRoom(roomName) {
+    if (isSleeping && roomName !== 'bedroom') {
+        alert("Tom uxlayapti! Uni uyg'otish uchun avval chiroqni yoqing.");
+        return;
+    }
+
+    if(isShowering) toggleShower();
+    if(recognition) try { recognition.stop(); } catch(e){}
+    chatBubble.style.display = 'none';
+    currentRoom = roomName;
+    
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    
+    document.getElementById('kitchen-furniture').style.display = 'none';
+    document.getElementById('shower-item').style.display = 'none';
+    document.getElementById('lamp-item').style.display = 'none';
+    document.getElementById('bed-furniture').style.display = 'none';
+
+    catContainer.style.bottom = 'auto';
+    catContainer.style.top = '48%';
+    catContainer.style.zIndex = '5';
+    resetTomFace();
+
+    if (roomName === 'living') {
+        screen.className = "game-screen room-living";
+        document.getElementById('nav-speak').classList.add('active');
+        // Mikrofon faollashishi foydalanuvchining ilk bosishiga bog'liq (Brauzer qoidasi)
+        chatBubble.style.display = 'block';
+        chatBubble.innerText = "Mikrofonni yoqish uchun ekranga bir marta bosing! 🎙️";
+    } 
+    else if (roomName === 'kitchen') {
+        screen.className = "game-screen room-kitchen";
+        document.getElementById('nav-kitchen').classList.add('active');
+        document.getElementById('kitchen-furniture').style.display = 'flex';
+    } 
+    else if (roomName === 'bathroom') {
+        screen.className = "game-screen room-bathroom";
+        document.getElementById('nav-bathroom').classList.add('active');
+        document.getElementById('shower-item').style.display = 'block';
+    } 
+    else if (roomName === 'bedroom') {
+        screen.className = isSleeping ? "game-screen room-bedroom room-dark" : "game-screen room-bedroom";
+        document.getElementById('nav-bedroom').classList.add('active');
+        document.getElementById('lamp-item').style.display = 'block';
+        document.getElementById('bed-furniture').style.display = 'block';
+        
+        catContainer.style.top = 'auto';
+        catContainer.style.bottom = '110px';
+        catContainer.style.zIndex = '2';
+        if(isSleeping) catFace.innerText = '😴';
+    }
+}
+
+// Oshxona (Cheksiz ovqatlar)
+function feedTom(foodEmoji) {
+    catFace.innerText = '😋';
+    coins += 3;
+    document.getElementById('coin-display').innerText = coins;
+    setTimeout(() => { resetTomFace(); }, 1000);
+}
+
+// Vanna
+function toggleShower() {
+    isShowering = !isShowering;
+    const drops = document.getElementById('water-drops');
+    if (isShowering) {
+        catFace.innerText = '🚿';
+        drops.style.display = 'block';
+        coins += 4;
+        document.getElementById('coin-display').innerText = coins;
+    } else {
+        drops.style.display = 'none';
+        resetTomFace();
+    }
+}
+
+// Yotoqxona
+function toggleLight() {
+    isSleeping = !isSleeping;
+    if (isSleeping) {
+        screen.classList.add('room-dark');
+        catFace.innerText = '😴';
+    } else {
+        screen.classList.remove('room-dark');
+        catFace.innerText = equippedHead;
+        coins += 15;
+        document.getElementById('coin-display').innerText = coins;
+    }
+}
+
+// Tomni bosganda (Mehmonxonada ovozni majburiy start qiladi)
+function hitTom() {
+    if (currentRoom === 'living') {
+        startVoice();
+        return;
+    }
+    if (isSleeping || isShowering) return;
+    catFace.innerText = '😫';
+    catFace.style.transform = 'translateY(25px) rotate(12deg)';
+    setTimeout(() => { resetTomFace(); }, 800);
+}
+
+// Ekranning ixtiyoriy joyi bosilganda ham ovoz loopini ochish (Brauzer ruxsati uchun)
+document.body.addEventListener('click', () => {
+    if(currentRoom === 'living' && !isSleeping && !isSpeakingNow) {
+        startVoice();
+    }
+});
+
+function resetTomFace() {
+    catFace.style.transform = 'none';
+    catFace.innerText = isSleeping ? '😴' : equippedHead;
+}
+
+function toggleShop(show) {
+    if(isSleeping && show) { alert("Tom uxlayapti, do'konni ochib bo'lmaydi!"); return; }
+    if(show && recognition) try { recognition.stop(); } catch(e){}
+    document.getElementById('shop-overlay').style.display = show ? 'flex' : 'none';
+}
+
+function buyItem(type, emoji, id, price) {
+    if (inventory[id]) { toggleEquip(type, emoji); return; }
+    if (coins >= price) {
+        coins -= price;
+        inventory[id] = true;
+        const btn = document.getElementById('b-' + id);
+        btn.innerText = "Kiyish";
+        btn.className = "use-btn";
+        toggleEquip(type, emoji);
+        document.getElementById('coin-display').innerText = coins;
+    } else {
+        alert(`Mablag' yetarli emas! Sizga ${price} tanga kerak.`);
+    }
+}
+
+function toggleEquip(type, emoji) {
+    if (type === 'hat') {
+        if (equippedHat === emoji) equippedHat = '';
+        else equippedHat = emoji;
+        document.getElementById('cat-hat-slot').innerText = equippedHat;
+    } else if (type === 'head') {
+        if (equippedHead === emoji) equippedHead = '🐱';
+        else equippedHead = emoji;
+        resetTomFace();
+    }
+}
+
+setTimeout(() => { changeRoom('living'); }, 200);
+
+    </script>
+
+</body>
+</html>

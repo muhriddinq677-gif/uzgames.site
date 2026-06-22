@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zombie Map Tycoon - Davlatlar Tizimi</title>
+    <style>
+        :root {
+            --bg: #121212;
+            --panel: #1e1e1e;
+            --green: #00ff66;
+            --red: #ff3333;
+            --blue: #3399ff;
+        }
+        body {
+            background-color: var(--bg); color: #fff;
+            font-family: 'Segoe UI', sans-serif; margin: 0; padding: 15px;
+            display: flex; flex-direction: column; align-items: center; min-height: 100vh; box-sizing: border-box;
+        }
+        h1 { color: var(--green); margin: 5px 0 15px 0; font-size: 1.8rem; text-shadow: 0 0 10px rgba(0,255,102,0.3); }
+        
+        .main-layout { display: flex; flex-direction: column; gap: 15px; max-width: 1000px; width: 100%; }
+        .panel { background: var(--panel); border: 2px solid #333; border-radius: 12px; padding: 15px; box-sizing: border-box; }
+        .panel-title { font-size: 1.2rem; font-weight: bold; border-bottom: 2px solid #333; padding-bottom: 8px; margin-bottom: 12px; color: var(--green); text-align: center; }
+        
+        /* Zombi zavodi */
+        .factory-box { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px; }
+        .click-btn { background: #1a4223; border: 3px solid var(--green); width: 100px; height: 100px; border-radius: 50%; font-size: 3rem; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px rgba(0,255,102,0.2); outline: none; transition: transform 0.05s; }
+        .click-btn:active { transform: scale(0.93); }
+        .counter-txt { font-size: 1.1rem; font-weight: bold; margin: 10px 0; text-align: center; }
+        .counter-txt span { color: var(--green); font-size: 1.3rem; }
+
+        /* Davlatlar paneli */
+        .countries-grid { display: flex; flex-direction: column; gap: 10px; }
+        .country-btn { background: #252525; border: 1px solid #444; padding: 12px; border-radius: 8px; text-align: left; color: #fff; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .country-btn.active { border-color: var(--green); background: #1d3324; }
+        .country-btn:disabled { opacity: 0.4; cursor: not-allowed; border-color: #222; }
+        .lock-icon { font-size: 0.9rem; color: #aaa; }
+
+        /* Shaharlar ro'yxati */
+        .map-container { display: flex; flex-direction: column; gap: 15px; }
+        .city-card { background: #151515; border: 1px solid #333; border-radius: 8px; padding: 15px; position: relative; }
+        .city-header { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 10px; font-size: 1rem; }
+        .city-info { font-size: 0.85rem; color: #aaa; margin-bottom: 15px; }
+        .soldier-count { color: var(--blue); font-weight: bold; }
+        .req-count { color: var(--green); font-weight: bold; }
+        
+        /* Qiyshiq Yo'lak */
+        .road-wrapper { position: relative; width: 100%; height: 60px; background: #222; border-radius: 8px; margin-bottom: 15px; border: 1px dashed #444; overflow: hidden; }
+        .road-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .road-path-bg { fill: none; stroke: #333; stroke-width: 8; stroke-linecap: round; }
+        .road-path-fill { fill: none; stroke: var(--green); stroke-width: 8; stroke-linecap: round; stroke-dasharray: 1000; stroke-dashoffset: 1000; transition: stroke-dashoffset 0.1s linear; }
+
+        /* Yo'ldagi tokenlar */
+        .character { position: absolute; font-size: 1.6rem; top: 50%; transform: translate(-50%, -50%); z-index: 5; transition: left 0.1s linear, top 0.1s linear; }
+        .zombie-token { left: 5%; color: var(--green); }
+        .soldier-token { right: 5%; color: var(--blue); }
+        
+        .attack-btn { width: 100%; background: #800000; color: #fff; border: none; padding: 10px; font-weight: bold; border-radius: 5px; cursor: pointer; transition: background 0.2s; }
+        .attack-btn:hover { background: #b30000; }
+        .attack-btn:disabled { background: #444; color: #888; cursor: not-allowed; }
+        .conquered { border-color: var(--green) !important; background: #0c2414 !important; }
+
+        @media (min-width: 768px) {
+            .main-layout { display: grid; grid-template-columns: 1fr 1.2fr 2fr; }
+            .factory-panel, .countries-panel { height: fit-content; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Zombie World Tycoon 🧟‍♂️</h1>
+
+    <div class="main-layout">
+        <!-- 1-Ustun: Laboratoriya -->
+        <div class="panel factory-panel">
+            <div class="panel-title">Zombi Laboratoriyasi</div>
+            <div class="factory-box">
+                <button class="click-btn" onclick="pressInfect()">☣️</button>
+                <div class="counter-txt">Bosishlar: <span id="clicks-val">0</span> / 10</div>
+                <div class="counter-txt" style="border-top: 1px solid #333; width: 100%; padding-top: 10px;">
+                    Sizning Armiyangiz:<br><span id="zombie-val" style="font-size: 1.8rem;">0</span> ta Zombi
+                </div>
+            </div>
+        </div>
+
+        <!-- 2-Ustun: Davlatlar Tizimi -->
+        <div class="panel countries-panel">
+            <div class="panel-title">Dunyo Davlatlari</div>
+            <div class="countries-grid" id="countries-list">
+                <!-- Davlatlar tugmalari JS orqali shu yerga chiqadi -->
+            </div>
+        </div>
+
+        <!-- 3-Ustun: Shaharlar Xaritasi -->
+        <div class="panel map-panel">
+            <div class="panel-title" id="current-country-title">Xarita</div>
+            <div class="map-container" id="map-cities">
+                <!-- Shaharlar shu yerga yuklanadi -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+    let clickCount = 0;
+let totalZombies = 0;
+let currentCountryIdx = 0; // Hozir o'ynalayotgan davlat IDsi
+
+// Dunyo Davlatlari Ma'lumotlar Bazasi
+// 1-Davlatda aniq siz aytgan 10 dan 50 gacha bo'lgan askar qoidasi joylandi
+let worldData = [
+    {
+        name: "1-Davlat (1-Level)",
+        unlocked: true,
+        cities: [
+            { id: 1, name: "Zon-1: Kichik Qishloq", soldiers: 10, required: 11, progress: 0, isMarching: false, conquered: false, speed: 2 },
+            { id: 2, name: "Zon-2: Chegara Shaharchasi", soldiers: 20, required: 21, progress: 0, isMarching: false, conquered: false, speed: 1.6 },
+            { id: 3, name: "Zon-3: Markaziy Shoxko'cha", soldiers: 30, required: 31, progress: 0, isMarching: false, conquered: false, speed: 1.3 },
+            { id: 4, name: "Zon-4: Harbiy Baza", soldiers: 40, required: 41, progress: 0, isMarching: false, conquered: false, speed: 1.0 },
+            { id: 5, name: "Zon-5: Poytaxt Markazi", soldiers: 50, required: 51, progress: 0, isMarching: false, conquered: false, speed: 0.7 }
+        ]
+    },
+    {
+        name: "2-Davlat (2-Level)",
+        unlocked: false,
+        cities: [
+            { id: 1, name: "Zon-1: Sibir Posti", soldiers: 60, required: 61, progress: 0, isMarching: false, conquered: false, speed: 1.2 },
+            { id: 2, name: "Zon-2: Ural Zavodi", soldiers: 70, required: 71, progress: 0, isMarching: false, conquered: false, speed: 1.0 },
+            { id: 3, name: "Zon-3: Kola Porti", soldiers: 80, required: 81, progress: 0, isMarching: false, conquered: false, speed: 0.8 },
+            { id: 4, name: "Zon-4: Kreml Himoyasi", soldiers: 100, required: 101, progress: 0, isMarching: false, conquered: false, speed: 0.5 }
+        ]
+    },
+    {
+        name: "3-Davlat (3-Level)",
+        unlocked: false,
+        cities: [
+            { id: 1, name: "Zon-1: Nevada Sahrasi", soldiers: 120, required: 121, progress: 0, isMarching: false, conquered: false, speed: 1.0 },
+            { id: 2, name: "Zon-2: Texas Neft Bazasi", soldiers: 150, required: 151, progress: 0, isMarching: false, conquered: false, speed: 0.8 },
+            { id: 3, name: "Zon-3: Pentagon Shtabi", soldiers: 200, required: 201, progress: 0, isMarching: false, conquered: false, speed: 0.4 },
+            { id: 4, name: "Zon-4: Pentagon Shtabi", soldiers: 250, required: 251, progress: 0, isMarching: false, conquered: false, speed: 0.4 },
+            { id: 5, name: "Zon-5: Pentagon Shtabi", soldiers: 300, required: 301, progress: 0, isMarching: false, conquered: false, speed: 0.4 }
+        ]
+    }
+];
+
+// O'yin ekranini boshqarish
+function renderGame() {
+    // 1. Davlatlar ro'yxatini chizish
+    const countryContainer = document.getElementById('countries-list');
+    countryContainer.innerHTML = '';
+    
+    worldData.forEach((country, idx) => {
+        let isActive = idx === currentCountryIdx ? 'active' : '';
+        let isLocked = !country.unlocked;
+        let lockText = isLocked ? '<span class="lock-icon">🔒 Qulfli</span>' : (checkCountryCleared(idx) ? '<span style="color:var(--green)">✓ 100%</span>' : '<span>⏳ Faol</span>');
+        
+        countryContainer.innerHTML += `
+            <button class="country-btn ${isActive}" ${isLocked ? 'disabled' : ''} onclick="switchCountry(${idx})">
+                <span>${country.name}</span>
+                ${lockText}
+            </button>
+        `;
+    });
+
+    // 2. Tanlangan davlat sarlavhasi va shaharlarini chizish
+    let currentCountry = worldData[currentCountryIdx];
+    document.getElementById('current-country-title').innerText = `${currentCountry.name} Shaharlari`;
+
+    const cityContainer = document.getElementById('map-cities');
+    cityContainer.innerHTML = '';
+
+    currentCountry.cities.forEach((city, idx) => {
+        let cardClass = city.conquered ? "city-card conquered" : "city-card";
+        let btnText = city.conquered ? "SHAHAR NAZORAT OSTIDA ✓" : (city.isMarching ? "Zombilar yo'lda..." : `Hujum boshlash (${city.required} ta zombi)`);
+        let btnDisabled = city.conquered || city.isMarching || totalZombies < city.required ? "disabled" : "";
+
+        let charactersHtml = '';
+        if (!city.conquered) {
+            charactersHtml = `
+                <div class="character zombie-token" id="zombie-char-${city.id}">🧟‍♂️</div>
+                <div class="character soldier-token" id="soldier-char-${city.id}">👨‍✈️</div>
+            `;
+        }
+
+        cityContainer.innerHTML += `
+            <div class="${cardClass}">
+                <div class="city-header">
+                    <span>${city.name}</span>
+                    <span style="color: ${city.conquered ? '#00ff66' : '#3399ff'}">
+                        ${city.conquered ? 'Yashil Zona' : 'Ko\'k Zona'}
+                    </span>
+                </div>
+                <div class="city-info">
+                    Ko'k askarlar: <span class="soldier-count">${city.soldiers} ta 👨‍✈️</span> | 
+                    Kerakli zombilar: <span class="req-count">${city.required} ta 🧟‍♂️</span>
+                </div>
+                
+                <div class="road-wrapper" id="road-wrap-${city.id}">
+                    <svg class="road-svg">
+                        <path class="road-path-bg" d="M 10 30 Q 120 5, 240 30 T 470 30" />
+                        <path class="road-path-fill" id="path-fill-${city.id}" d="M 10 30 Q 120 5, 240 30 T 470 30" />
+                    </svg>
+                    ${charactersHtml}
+                </div>
+
+                <button class="attack-btn" ${btnDisabled} onclick="sendZombies(${idx})">${btnText}</button>
+            </div>
+        `;
+
+        if (!city.conquered) {
+            setTimeout(() => {
+                let path = document.getElementById(`path-fill-${city.id}`);
+                if (path) {
+                    let length = path.getTotalLength();
+                    path.style.strokeDasharray = length;
+                    path.style.strokeDashoffset = length - (length * (city.progress / 100));
+                }
+                updateZombiePosition(city);
+            }, 10);
+        }
+    });
+
+    document.getElementById('zombie-val').innerText = totalZombies;
+    document.getElementById('clicks-val').innerText = clickCount;
+}
+
+// Davlat to'liq bosib olindimi yoki yo'qmi tekshirish
+function checkCountryCleared(idx) {
+    return worldData[idx].cities.every(c => c.conquered);
+}
+
+// Davlatlar orasida almashish (Faqat qulfi ochiq bo'lsa)
+function switchCountry(idx) {
+    if (worldData[idx].unlocked) {
+        currentCountryIdx = idx;
+        renderGame();
+    }
+}
+
+function pressInfect() {
+    clickCount++;
+    if (clickCount >= 10) {
+        clickCount = 0;
+        totalZombies++;
+    }
+    renderGame();
+}
+
+function updateZombiePosition(city) {
+    let zombieEl = document.getElementById(`zombie-char-${city.id}`);
+    if (!zombieEl) return;
+
+    let leftPercent = 5 + (city.progress * 0.83);
+    zombieEl.style.left = leftPercent + "%";
+
+    let angle = (city.progress / 100) * Math.PI * 2;
+    let topPx = 30 - (Math.sin(angle * 1.5) * 18); 
+    zombieEl.style.top = topPx + "px";
+}
+
+function sendZombies(index) {
+    let currentCountry = worldData[currentCountryIdx];
+    let city = currentCountry.cities[index];
+    
+    if (totalZombies < city.required || city.isMarching || city.conquered) return;
+
+    totalZombies -= city.required;
+    city.isMarching = true;
+    renderGame();
+
+    let marchInterval = setInterval(() => {
+        city.progress += city.speed;
+
+        let path = document.getElementById(`path-fill-${city.id}`);
+        if (path) {
+            let length = path.getTotalLength();
+            path.style.strokeDashoffset = length - (length * (city.progress / 100));
+        }
+
+        updateZombiePosition(city);
+
+        if (city.progress >= 100) {
+            city.progress = 100;
+            clearInterval(marchInterval);
+            battle(city);
+        }
+    }, 40);
+}
+
+function battle(city) {
+    city.isMarching = false;
+    if (city.required > city.soldiers) {
+        city.conquered = true;
+        alert(`G'alaba! "${city.name}" shahri bosib olindi!`);
+        
+        // Agar joriy davlatdagi barcha shaharlar bosib bo'lingan bo'lsa, keyingi davlat qulfini ochish
+        if (checkCountryCleared(currentCountryIdx)) {
+            if (currentCountryIdx + 1 < worldData.length) {
+                worldData[currentCountryIdx + 1].unlocked = true;
+                alert(`🔥 DAHSID! Ushbu davlat to'liq bo'ysundirildi! Keyingi davlat qulfdan ochildi!`);
+            } else {
+                alert(`🏆 MUKAMMAL! Siz butun dunyoni zombilar imperiyasiga aylantirdingiz!`);
+            }
+        }
+    }
+    renderGame();
+}
+
+// O'yinni birinchi marta yuklash
+renderGame();
+
+    </script>
+
+</body>
+</html>

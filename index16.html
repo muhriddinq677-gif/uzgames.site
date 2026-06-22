@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Black Puzzle </title>
+    <style>
+        * { box-sizing: border-box; touch-action: manipulation; }
+        body {
+            background-color: #050505;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            color: #00ffcc;
+            overflow: hidden;
+        }
+        h1 { font-size: 1.5rem; margin-bottom: 15px; letter-spacing: 3px; }
+        
+        .puzzle-board {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            width: 90vw; /* Telfon ekrani kengligining 90% qismi */
+            max-width: 340px; /* Kompyuterda juda katta bo'lib ketmaydi */
+            aspect-ratio: 1 / 1;
+            background-color: #111;
+            padding: 10px;
+            border-radius: 12px;
+            border: 2px solid #222;
+            transition: all 0.6s ease;
+        }
+
+        .tile {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #1a1a1a;
+            color: #00ffcc;
+            font-size: 1.5rem;
+            font-weight: bold;
+            border-radius: 8px;
+            border: 1px solid #333;
+            box-shadow: 0 4px 0 #000;
+            transition: transform 0.1s, background 0.3s;
+        }
+        .tile:active { transform: scale(0.95); background-color: #222; }
+        .tile.empty { background: transparent; border: none; box-shadow: none; }
+
+        /* G'alaba effektlari */
+        .won-board { border-radius: 50%; transform: rotate(360deg); border-color: #ff00ff; }
+        .won-tile { border-radius: 50%; border-color: #ff00ff; color: #ff00ff; box-shadow: 0 0 10px #ff00ff; }
+
+        .btn {
+            margin-top: 25px;
+            padding: 15px 40px;
+            background: #00ffcc;
+            color: #000;
+            border: none;
+            border-radius: 30px;
+            font-weight: bold;
+            font-size: 1rem;
+            box-shadow: 0 5px 15px rgba(0, 255, 204, 0.3);
+        }
+    </style>
+</head>
+<body>
+
+    <h1 id="status">BLACK PUZZLE</h1>
+    <div class="puzzle-board" id="board"></div>
+    <button class="btn" onclick="shuffleGame()">YANGI O'YIN</button>
+
+    <script>
+        const boardElement = document.getElementById('board');
+        let tiles = [...Array(15).keys()].map(i => i + 1);
+        tiles.push(null);
+
+        function createBoard(isWon = false) {
+            boardElement.innerHTML = '';
+            tiles.forEach((tile, index) => {
+                const tileDiv = document.createElement('div');
+                tileDiv.classList.add('tile');
+                if (isWon) tileDiv.classList.add('won-tile');
+                
+                if (tile === null) {
+                    tileDiv.classList.add('empty');
+                } else {
+                    tileDiv.textContent = tile;
+                    // Telfon uchun 'touchstart' ham qo'shish mumkin, lekin 'click' universal
+                    tileDiv.onclick = () => moveTile(index);
+                }
+                boardElement.appendChild(tileDiv);
+            });
+        }
+
+        function moveTile(index) {
+            const emptyIndex = tiles.indexOf(null);
+            const row = Math.floor(index / 4);
+            const col = index % 4;
+            const emptyRow = Math.floor(emptyIndex / 4);
+            const emptyCol = emptyIndex % 4;
+
+            if (Math.abs(row - emptyRow) + Math.abs(col - emptyCol) === 1) {
+                // Vibratsiya effekti (faqat Android telfonlarda brauzer ruxsat bersa)
+                if (navigator.vibrate) navigator.vibrate(50);
+                
+                [tiles[index], tiles[emptyIndex]] = [tiles[emptyIndex], tiles[index]];
+                createBoard();
+                checkWin();
+            }
+        }
+
+        function checkWin() {
+            const isWon = tiles.slice(0, 15).every((t, i) => t === i + 1);
+            if (isWon && tiles[15] === null) {
+                boardElement.classList.add('won-board');
+                document.getElementById('status').textContent = "MUKAMMAL!";
+                createBoard(true);
+            }
+        }
+
+        function shuffleGame() {
+            boardElement.classList.remove('won-board');
+            document.getElementById('status').textContent = "BLACK PUZZLE";
+            // Haqiqiy aralashtirish algoritmi
+            for (let i = 0; i < 200; i++) {
+                const emptyIdx = tiles.indexOf(null);
+                const neighbors = [];
+                if (emptyIdx % 4 > 0) neighbors.push(emptyIdx - 1);
+                if (emptyIdx % 4 < 3) neighbors.push(emptyIdx + 1);
+                if (emptyIdx > 3) neighbors.push(emptyIdx - 4);
+                if (emptyIdx < 12) neighbors.push(emptyIdx + 4);
+                const randomNeighbor = neighbors[Math.floor(Math.random() * neighbors.length)];
+                [tiles[emptyIdx], tiles[randomNeighbor]] = [tiles[randomNeighbor], tiles[emptyIdx]];
+            }
+            createBoard();
+        }
+
+        createBoard();
+    </script>
+</body>
+</html>

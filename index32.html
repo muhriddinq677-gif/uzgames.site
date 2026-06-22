@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mundial 2026: Pro Penalty Final</title>
+    <style>
+        :root { --field: #1e8449; --accent: #f1c40f; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; user-select: none; }
+        body { background: #000; color: white; overflow: hidden; touch-action: none; width: 100vw; height: 100vh; }
+
+        .screen { position: fixed; inset: 0; background: radial-gradient(circle, #1a1a1a, #000); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; text-align: center; }
+        .hidden { display: none !important; }
+        
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px; overflow-y: auto; width: 100%; max-width: 500px; max-height: 55vh; margin: 15px 0; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 10px; }
+        
+        button { padding: 12px; border: none; border-radius: 8px; background: var(--accent); color: #000; font-weight: bold; cursor: pointer; text-transform: uppercase; font-size: 0.8rem; }
+        .team-btn { background: #333; color: white; border: 1px solid #444; margin-bottom: 5px; }
+
+        #stadium { position: relative; width: 100vw; height: 100vh; background: var(--field); overflow: hidden; }
+        .grass-stripes { position: absolute; inset: 0; background: repeating-linear-gradient(0deg, transparent, transparent 10%, rgba(0,0,0,0.05) 10.1%, rgba(0,0,0,0.05) 20%); }
+
+        /* QALIN STADION CHIZIQLARI (10px) */
+        .penalty-lines { position: absolute; top: 18%; left: 50%; transform: translateX(-50%); width: 95vw; max-width: 650px; height: 400px; z-index: 1; pointer-events: none; }
+        .big-box { position: absolute; top: 0; left: 0; width: 100%; height: 240px; border: 10px solid white; border-top: none; opacity: 0.9; }
+        .small-box { position: absolute; top: 0; left: 15%; width: 70%; height: 100px; border: 10px solid white; border-top: none; opacity: 0.9; }
+        .arc { position: absolute; top: 240px; left: 25%; width: 50%; height: 70px; border: 10px solid white; border-top: none; border-radius: 0 0 150px 150px; opacity: 0.9; }
+
+        #goal { position: absolute; top: 18%; left: 50%; transform: translateX(-50%); width: 85vw; max-width: 380px; height: 180px; border: 12px solid white; border-bottom: none; z-index: 2; background: repeating-linear-gradient(0deg, transparent, transparent 15px, rgba(255,255,255,0.1) 16px), repeating-linear-gradient(90deg, transparent, transparent 15px, rgba(255,255,255,0.1) 16px); }
+
+        .human { position: absolute; width: 45px; height: 95px; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 5; }
+        .head { width: 20px; height: 20px; background: #ffdbac; border-radius: 50%; margin: 0 auto; border: 1px solid #333; }
+        .torso { width: 20px; height: 40px; margin: 2px auto; border-radius: 4px; position: relative; }
+        .arm { position: absolute; width: 8px; height: 28px; background: #ffdbac; top: 2px; }
+        .arm.l { left: -9px; } .arm.r { right: -9px; }
+        .leg { position: absolute; width: 10px; height: 35px; background: #111; bottom: -32px; }
+        .leg.l { left: 0px; } .leg.r { right: 1px; }
+
+        #ball { position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%); width: 26px; height: 26px; background: radial-gradient(circle at 30% 30%, #fff, #999); border-radius: 50%; z-index: 10; box-shadow: 0 5px 10px rgba(0,0,0,0.3); }
+
+        #header { position: absolute; top: 10px; width: 94%; left: 3%; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.85); padding: 12px; border-radius: 10px; z-index: 50; border: 1px solid #444; font-size: 0.75rem; }
+        #banner { position: absolute; top: 85px; width: 100%; text-align: center; font-weight: 900; background: var(--accent); color: #000; padding: 8px 0; z-index: 50; }
+        
+        #status-msg { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%) scale(0); font-size: 4rem; font-weight: 900; color: #f1c40f; text-shadow: 0 0 20px rgba(0,0,0,0.8); z-index: 80; transition: 0.3s; pointer-events: none; -webkit-text-stroke: 1.5px black; }
+        #status-msg.show { transform: translate(-50%, -50%) scale(1.2); }
+
+        #controls { position: absolute; bottom: 30px; width: 100%; display: flex; justify-content: center; gap: 8px; z-index: 70; padding: 0 10px; }
+        .ctrl-btn { flex: 1; padding: 15px 5px; background: #000; color: white; border: 2px solid white; border-radius: 10px; font-weight: bold; }
+
+        table { width: 100%; background: white; color: #000; border-collapse: collapse; margin: 10px 0; font-size: 0.85rem; border-radius: 8px; overflow: hidden; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        th { background: #f1c40f; }
+        .winner-msg { color: gold; font-size: 2.5rem; text-shadow: 0 0 10px black; margin: 20px; }
+    </style>
+</head>
+<body>
+
+<div id="start-screen" class="screen">
+    <h1 style="color: var(--accent); font-size: 2rem;">🏆 MUNDIAL 2026</h1>
+    <p>JAMOANGIZNI TANLANG</p>
+    <div id="team-grid" class="grid"></div>
+</div>
+
+<div id="group-screen" class="screen hidden">
+    <h2 id="stage-title" style="color: var(--accent);">GURUH BOSQICHI</h2>
+    <table id="group-table">
+        <thead><tr><th>Jamoa</th><th>PTS</th><th>GOL</th></tr></thead>
+        <tbody id="group-body"></tbody>
+    </table>
+    <p id="match-info" style="margin: 15px 0; font-weight: bold; font-size: 1.1rem;"></p>
+    <button onclick="playMatch()" id="play-btn" style="width: 200px;">O'YINGA TUSHISH</button>
+</div>
+
+<div id="stadium">
+    <div class="grass-stripes"></div>
+    <div class="penalty-lines"><div class="big-box"></div><div class="small-box"></div><div class="arc"></div></div>
+    <div id="header">
+        <div id="t1-name">TEAM 1: 0</div>
+        <div id="stage-label" style="color: var(--accent); font-weight: bold;">GURUH</div>
+        <div id="t2-name">TEAM 2: 0</div>
+    </div>
+    <div id="banner">NAVBT: SIZ TEPASIZ</div>
+    <div id="status-msg">GOAL!</div>
+    <div id="goal"><div id="keeper" class="human" style="bottom: 0; left: 50%; transform: translateX(-50%);"><div class="head"></div><div class="torso" id="gk-torso"><div class="arm l"></div><div class="arm r"></div><div class="leg l"></div><div class="leg r"></div></div></div></div>
+    <div id="ball"></div>
+    <div id="striker" class="human" style="bottom: 60px; left: 35%;"><div class="head"></div><div class="torso" style="background: #e74c3c;"><div class="arm l"></div><div class="arm r"></div><div class="leg l"></div><div class="leg r"></div></div></div>
+    <div id="controls" class="hidden">
+        <button class="ctrl-btn" onclick="defend(-110)">CHAP</button>
+        <button class="ctrl-btn" onclick="defend(0)">MARKAZ</button>
+        <button class="ctrl-btn" onclick="defend(110)">O'NG</button>
+    </div>
+    <div id="hitbox" style="position:absolute; inset: 15% 0 0 0; z-index: 60; cursor: crosshair;"></div>
+</div>
+
+<div id="res-screen" class="screen hidden">
+    <div id="res-wrap">
+        <h1 id="res-title" style="color: var(--accent);">NATIJA</h1>
+        <h2 id="res-score" style="margin: 15px 0; font-size: 2.5rem;">0 - 0</h2>
+        <button onclick="nextFlow()" style="width: 200px;">DAVOM ETTIRISH</button>
+    </div>
+</div>
+
+<script>
+const teamList = [
+  "USA", "Mexico", "Canada", "Uzbekistan", "Iran", "Japan", "North Korea", 
+  "Italy", "Portugal", "Spain", "Morocco", "Switzerland", "Germany", 
+  "Uruguay", "Colombia", "Senegal", "Denmark", "Peru", "Nigeria", 
+  "Algeria", "Austria", "Ukraine", "South Korea", "Chile", "Tunisia", 
+  "Egypt", "Scotland", "Hungary", "Poland", "Turkey", "Serbia", 
+  "Australia", "Sweden", "Romania", "Norway", "Slovakia", "Ghana", 
+  "Iceland", "Panama", "Cameroon", "Qatar", "Saudi Arabia"
+];
+ 
+let myTeam = "", opponents = [], stats = {}, curOpp = "", stage = 'Guruh', pG = 0, eG = 0, round = 0, shooting = true, busy = false, playedCount = 0;
+
+const grid = document.getElementById('team-grid');
+teamList.sort().forEach(t => {
+    let b = document.createElement('button'); b.className = 'team-btn'; b.innerText = t;
+    b.onclick = () => { myTeam = t; initTourney(); }; grid.appendChild(b);
+});
+
+function initTourney() {
+    opponents = teamList.filter(x => x !== myTeam).sort(() => Math.random() - 0.5).slice(0, 3);
+    stats = {};
+    [myTeam, ...opponents].forEach(n => { stats[n] = {pts: 0, goals: 0}; });
+    playedCount = 0; stage = 'Guruh';
+    document.getElementById('start-screen').classList.add('hidden');
+    showGroup();
+}
+
+function showGroup() {
+    const body = document.getElementById('group-body'); body.innerHTML = "";
+    let sorted = Object.keys(stats).sort((a,b) => stats[b].pts - stats[a].pts || stats[b].goals - stats[a].goals);
+    sorted.forEach(n => {
+        body.innerHTML += `<tr style="${n==myTeam?'background:#f1c40f44':''}"><td>${n==myTeam?'<b>'+n+'</b>':n}</td><td>${stats[n].pts}</td><td>${stats[n].goals}</td></tr>`;
+    });
+    if(playedCount >= 3) { checkPlayoff(); return; }
+    curOpp = opponents[playedCount];
+    document.getElementById('match-info').innerText = `NAVBATDAGI RAQIB: ${curOpp}`;
+    document.getElementById('group-screen').classList.remove('hidden');
+}
+
+function defend(pos) {
+    if(shooting || busy) return;
+    const goal = document.getElementById('goal').getBoundingClientRect();
+    const targets = [-110, 0, 110];
+    const tx = (window.innerWidth/2) + targets[Math.floor(Math.random()*3)];
+    const ty = goal.top + 60;
+    fireShot(tx, ty, pos);
+}
+
+function updateUI() {
+    document.getElementById('t1-name').innerText = `${myTeam.toUpperCase()}: ${pG}`;
+    document.getElementById('t2-name').innerText = `${curOpp.toUpperCase()}: ${eG}`;
+    document.getElementById('banner').innerText = shooting ? "NAVBT: SIZ TEPASIZ" : "NAVBT: RAQIB TEPADI";
+    document.getElementById('controls').classList.toggle('hidden', shooting);
+    document.getElementById('hitbox').classList.toggle('hidden', !shooting);
+    document.getElementById('gk-torso').style.background = shooting ? "#0055ff" : "#e74c3c";
+}
+
+function playMatch() {
+    document.getElementById('group-screen').classList.add('hidden');
+    pG = 0; eG = 0; round = 0; shooting = true;
+    updateUI(); resetBall();
+}
+
+function finishMatch() {
+    document.getElementById('status-msg').classList.remove('show');
+    document.getElementById('res-screen').classList.remove('hidden');
+    document.getElementById('res-score').innerText = `${pG} - ${eG}`;
+}
+
+function nextFlow() {
+    document.getElementById('res-screen').classList.add('hidden');
+    if(stage === 'Guruh') {
+        stats[myTeam].goals += pG; stats[curOpp].goals += eG;
+        if(pG > eG) stats[myTeam].pts += 3; else if(pG == eG) { stats[myTeam].pts += 1; stats[curOpp].pts += 1; } else stats[curOpp].pts += 3;
+        
+        let others = opponents.filter(o => o !== curOpp);
+        if(others.length >= 2) {
+            let s1 = Math.floor(Math.random()*4), s2 = Math.floor(Math.random()*4);
+            stats[others[0]].goals += s1; stats[others[1]].goals += s2;
+            if(s1 > s2) stats[others[0]].pts += 3; else if(s1 < s2) stats[others[1]].pts += 3; else { stats[others[0]].pts += 1; stats[others[1]].pts += 1; }
+        }
+        playedCount++; showGroup();
+    } else {
+        if(pG > eG) {
+            if(stage === 'Final') { 
+                document.getElementById('res-wrap').innerHTML = `<h1 class="winner-msg">🏆 CHAMPION: ${myTeam.toUpperCase()}!</h1><button onclick="location.reload()">QAYTA BOSHLASH</button>`;
+                document.getElementById('res-screen').classList.remove('hidden');
+                return;
+            }
+            const flow = {'1/16': '1/8', '1/8': '1/4', '1/4': '1/2', '1/2': 'Final'};
+            stage = flow[stage]; 
+            curOpp = teamList.filter(t => t != myTeam)[Math.floor(Math.random()*40)];
+            document.getElementById('stage-label').innerText = stage.toUpperCase() + " FINAL";
+            document.getElementById('stage-title').innerText = stage.toUpperCase() + " FINAL";
+            document.getElementById('group-body').innerHTML = `<tr><td colspan="3">G'alaba! Keyingi bosqich: ${stage} Final<br>Raqib: ${curOpp}</td></tr>`;
+            document.getElementById('group-screen').classList.remove('hidden');
+        } else { alert("MAG'LUBIYAT!"); location.reload(); }
+    }
+}
+
+function checkPlayoff() {
+    let rank = Object.keys(stats).sort((a,b) => stats[b].pts - stats[a].pts || stats[b].goals - stats[a].goals);
+    if(rank.indexOf(myTeam) < 2) {
+        stage = '1/16'; curOpp = teamList.filter(t => t != myTeam)[Math.floor(Math.random()*40)];
+        document.getElementById('stage-label').innerText = "1/16 FINAL";
+        document.getElementById('stage-title').innerText = "PLEY-OFF 1/16";
+        document.getElementById('group-body').innerHTML = `<tr><td colspan="3">Guruhdan chiqdingiz!<br>Raqib: ${curOpp}</td></tr>`;
+        document.getElementById('group-screen').classList.remove('hidden');
+    } else { alert("Guruhda qolib ketdingiz!"); location.reload(); }
+}
+
+function resetBall() {
+    const b = document.getElementById('ball');
+    b.style.transition = "none"; b.style.bottom = "120px"; b.style.left = "50%"; b.style.transform = "translateX(-50%)";
+    document.getElementById('keeper').style.left = "50%";
+    document.getElementById('status-msg').classList.remove('show');
+    busy = false;
+}
+
+document.getElementById('hitbox').onclick = (e) => {
+    if(!shooting || busy) return;
+    fireShot(e.clientX, e.clientY);
+};
+
+function fireShot(tx, ty, defPos = null) {
+    busy = true;
+    const b = document.getElementById('ball');
+    const gk = document.getElementById('keeper');
+    const goal = document.getElementById('goal').getBoundingClientRect();
+    const statusMsg = document.getElementById('status-msg');
+    const dx = tx - (window.innerWidth/2);
+    const dy = -(window.innerHeight - ty - 120);
+    b.style.transition = "all 0.4s linear";
+    b.style.transform = `translate(calc(-50% + ${dx}px), ${dy}px) scale(0.6)`;
+    let jump = shooting ? (Math.random() > 0.6 ? (Math.random() > 0.5 ? 110 : -110) : 0) : defPos;
+    gk.style.left = `calc(50% + ${jump}px)`;
+    setTimeout(() => {
+        const saved = Math.abs(jump - dx) < 55;
+        const out = ty < goal.top || tx < goal.left || tx > goal.right;
+        if(saved) {
+            b.style.transition = "all 0.3s ease-out";
+            b.style.transform = `translate(calc(-50% + ${dx}px), -220px) scale(0.8)`;
+            statusMsg.innerText = "SAVE!";
+        } else if(!out) {
+            if(shooting) pG++; else eG++;
+            statusMsg.innerText = "GOAL!";
+        } else { statusMsg.innerText = "MISS!"; }
+        statusMsg.classList.add('show');
+        round++; shooting = !shooting; updateUI();
+        setTimeout(() => { if(round >= 10 && pG != eG) finishMatch(); else if(round >= 10 && pG == eG && stage == 'Guruh') finishMatch(); else resetBall(); }, 1000);
+    }, 400);
+}
+</script>
+</body>
+</html>

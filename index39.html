@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Vertikal Mexanik Poyga - Har 10 Qadamda Savol</title>
+<style>
+ :root {
+     --p1: #ff4757;
+     --p2: #2ed573;
+     --bg: #1e272e;
+ }
+ * { box-sizing: border-box; }
+ body, html { margin: 0; padding: 0; width: 100%; height: 100%; font-family: 'Segoe UI', sans-serif; background: var(--bg); color: #fff; overflow: hidden; user-select: none; }
+ 
+ /* Lobby / Start oynasi */
+ #lobby { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+ .start-btn { padding: 15px 40px; font-size: 24px; font-weight: bold; background: #ffa500; border: none; border-radius: 10px; cursor: pointer; color: #000; box-shadow: 0 0 15px rgba(255,165,0,0.5); }
+ 
+ /* Ekran ikkita vertikal yo'lakka bo'lingan (Chap va O'ng) */
+ .game-layout { display: flex; width: 100%; height: 100%; }
+ .player-screen { flex: 1; display: flex; flex-direction: column; position: relative; border-right: 4px dashed #333; }
+ .player-screen:last-child { border-right: none; }
+ 
+ /* Vertikal Yugurish Yo'lagi (Tepaga qarab ⬆️) */
+ .track-viewport { height: 60%; background: #222; position: relative; overflow: hidden; display: flex; justify-content: center; border-bottom: 2px solid #444; }
+ .track-moving { position: absolute; bottom: 0; width: 100%; height: 5000px; transition: transform 0.1s linear; }
+ .track-bg-line { position: absolute; height: 100%; width: 4px; background: repeating-linear-gradient(0deg, #fff, #fff 20px, transparent 20px, transparent 40px); left: 50%; transform: translateX(-50%); opacity: 0.15; }
+ .checkpoint { position: absolute; width: 100%; height: 4px; background: #00ccff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.9rem; color: #fff; text-shadow: 1px 1px 2px #000; }
+ 
+ /* Runner (Odamchalar markazda joylashib, faqat tepaga qarashadi) */
+ .runner { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); font-size: 3.8rem; z-index: 10; display: flex; flex-direction: column; align-items: center; }
+ .runner-label { font-size: 0.85rem; font-weight: bold; background: rgba(0,0,0,0.8); padding: 1px 6px; border-radius: 4px; margin-bottom: -5px; }
+
+ /* Pastki Boshqaruv va Klik Tugmasi */
+ .control-area { height: 40%; background: rgba(255,255,255,0.02); padding: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; gap: 10px; }
+ .dash-info { font-size: 1.1rem; font-weight: bold; color: #ccc; text-align: center; }
+ 
+ .run-btn { width: 120px; height: 120px; border-radius: 50%; font-size: 1.2rem; font-weight: bold; cursor: pointer; border: 4px solid #555; background: #2f3542; color: #fff; box-shadow: 0 6px 15px rgba(0,0,0,0.4); display: flex; flex-direction: column; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
+ .p1-screen .run-btn { border-color: var(--p1); }
+ .p2-screen .run-btn { border-color: var(--p2); }
+ .run-btn:active { transform: scale(0.92); background: #57606f; }
+ .run-btn span { font-size: 2rem; }
+
+ /* Savol To'siqlari (Popup Modal) */
+ .quiz-overlay { position: absolute; inset: 0; background: rgba(15, 23, 42, 0.96); z-index: 50; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 15px; }
+ .question-text { font-size: 24px; font-weight: bold; text-align: center; margin-bottom: 20px; color: #ffa500; }
+ .options-grid { display: grid; grid-template-columns: 1fr; gap: 10px; width: 100%; max-width: 280px; }
+ .option-btn { padding: 14px; font-size: 18px; font-weight: bold; border: 2px solid #444; border-radius: 8px; background: #1e272e; color: #fff; cursor: pointer; text-align: center; -webkit-tap-highlight-color: transparent; }
+ .option-btn:active { background: #3d3d3d; }
+</style>
+</head>
+<body>
+
+    <!-- Start / Finish Lobby -->
+    <div id="lobby">
+        <h1 style="color: #ffa500; font-size: 2.3rem; margin-bottom: 5px; text-shadow: 0 4px 10px rgba(0,0,0,0.5);"> Poyga </h1>
+        <p style="color: #aaa; margin-bottom: 25px; text-align: center; padding: 0 20px; max-width: 500px;">
+            Yo'l tepadan pastga qarab tushib kelaveradi. Har 10 ta "Klik" (qadam) bosganingizda yo'l qulflanadi va savol tushadi. Jami 10 ta savol (100 qadam).
+        </p>
+        <button class="start-btn" onclick="startGame()">POYGANI BOSHLASH 🏁</button>
+    </div>
+
+    <!-- O'yin maydoni -->
+    <div class="game-layout">
+        
+        <!-- 1-O'yinchi (Chap tomon - Qizil) -->
+        <div class="player-screen p1-screen" id="p1-area">
+            <div class="track-viewport">
+                <div class="track-moving" id="p1-track">
+                    <div class="track-bg-line"></div>
+                </div>
+                <div class="runner" id="p1-runner">
+                    <span class="runner-label" style="color:var(--p1)">P1 (Qizil)</span>
+                    <span id="p1-emoji">🏃‍♂️</span>
+                </div>
+            </div>
+            <div class="control-area">
+                <div class="dash-info">Qadam: <span id="p1-dist">0</span>/100<br>Savol: <span id="p1-qcount">0</span>/10</div>
+                <button class="run-btn" id="p1-run-trigger"><span>⬆️</span>YUGUR<br><small style="font-size:0.7rem;color:#aaa">[Tugma: A]</small></button>
+            </div>
+            <div class="quiz-overlay" id="p1-quiz">
+                <div class="question-text" id="p1-q-text">Savol...</div>
+                <div class="options-grid" id="p1-q-options"></div>
+            </div>
+        </div>
+
+        <!-- 2-O'yinchi (O'ng tomon - Yashil) -->
+        <div class="player-screen p2-screen" id="p2-area">
+            <div class="track-viewport">
+                <div class="track-moving" id="p2-track">
+                    <div class="track-bg-line"></div>
+                </div>
+                <div class="runner" id="p2-runner">
+                    <span class="runner-label" style="color:var(--p2)">P2 (Yashil)</span>
+                    <span id="p2-emoji">🏃‍♀️</span>
+                </div>
+            </div>
+            <div class="control-area">
+                <div class="dash-info">Qadam: <span id="p2-dist">0</span>/100<br>Savol: <span id="p2-qcount">0</span>/10</div>
+                <button class="run-btn" id="p2-run-trigger"><span>⬆️</span>YUGUR<br><small style="font-size:0.7rem;color:#aaa">[Tugma: L]</small></button>
+            </div>
+            <div class="quiz-overlay" id="p2-quiz">
+                <div class="question-text" id="p2-q-text">Savol...</div>
+                <div class="options-grid" id="p2-q-options"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+    let isPlaying = false;
+
+// O'yinchilar parametrlari (Jami 100 qadam - har 10 qadamda savol)
+let p1 = { steps: 0, questionsAnswered: 0, lock: false, lastQStep: 0, currentQData: null };
+let p2 = { steps: 0, questionsAnswered: 0, lock: false, lastQStep: 0, currentQData: null };
+
+function makeMathQuestion() {
+    let n1 = Math.floor(Math.random() * 10) + 2;
+    let n2 = Math.floor(Math.random() * 10) + 2;
+    let sign = Math.random() > 0.5 ? '+' : '-';
+    let qStr = `${n1} ${sign} ${n2}`;
+    let correct = sign === '+' ? (n1 + n2) : (n1 - n2);
+    
+    let opts = new Set([correct]);
+    while(opts.size < 3) {
+        let fake = correct + (Math.floor(Math.random() * 4) - 2);
+        if(fake !== correct) opts.add(fake); // BU YERDAGI XATO TO'G'RILANDI
+    }
+    return { text: qStr, ans: correct, choices: [...opts].sort(() => Math.random() - 0.5) };
+}
+
+// Vertikal yo'lakda har 10 qadamda chiziq chizish
+function buildCheckpoints() {
+    for (let i = 1; i <= 9; i++) {
+        let dist = i * 250; 
+        document.getElementById('p1-track').innerHTML += `<div class="checkpoint" style="bottom: ${dist}px;">${i*10} qadam</div>`;
+        document.getElementById('p2-track').innerHTML += `<div class="checkpoint" style="bottom: ${dist}px;">${i*10} qadam</div>`;
+    }
+    document.getElementById('p1-track').innerHTML += `<div class="checkpoint" style="bottom: 2500px; background:red; height:15px; font-size:1.2rem;">MARRA 🏁</div>`;
+    document.getElementById('p2-track').innerHTML += `<div class="checkpoint" style="bottom: 2500px; background:red; height:15px; font-size:1.2rem;">MARRA 🏁</div>`;
+}
+
+function startGame() {
+    document.getElementById("lobby").style.display = "none";
+    isPlaying = true;
+    
+    p1 = { steps: 0, questionsAnswered: 0, lock: false, lastQStep: 0, currentQData: null };
+    p2 = { steps: 0, questionsAnswered: 0, lock: false, lastQStep: 0, currentQData: null };
+    
+    document.getElementById('p1-track').innerHTML = '<div class="track-bg-line"></div>';
+    document.getElementById('p2-track').innerHTML = '<div class="track-bg-line"></div>';
+    
+    // Savol oynalarini yashirish (Yangi o'yin boshlanganda)
+    document.getElementById('p1-quiz').style.display = 'none';
+    document.getElementById('p2-quiz').style.display = 'none';
+    
+    buildCheckpoints();
+    moveTrack('p1', 0);
+    moveTrack('p2', 0);
+    updateLabels();
+}
+
+function executeStep(player) {
+    if (!isPlaying) return;
+    let pObj = player === 'p1' ? p1 : p2;
+    
+    if (pObj.lock) return; 
+
+    pObj.steps++;
+    
+    moveTrack(player, pObj.steps * 25);
+    updateLabels();
+
+    let emojiEl = document.getElementById(`${player}-emoji`);
+    emojiEl.innerText = pObj.steps % 2 === 0 ? (player==='p1'?'🏃‍♂️':'🏃‍♀️') : (player==='p1'?'🧍‍♂️':'🧍‍♀️');
+
+    if (pObj.steps % 10 === 0 && pObj.steps > pObj.lastQStep && pObj.questionsAnswered < 10) {
+        pObj.lock = true;
+        pObj.lastQStep = pObj.steps;
+        openQuestionBox(player);
+    }
+    
+    if (pObj.steps >= 100) {
+        finishRace(player);
+    }
+}
+
+function moveTrack(player, px) {
+    document.getElementById(`${player}-track`).style.transform = `translateY(${px}px)`;
+}
+
+function updateLabels() {
+    document.getElementById('p1-dist').innerText = p1.steps;
+    document.getElementById('p1-qcount').innerText = p1.questionsAnswered;
+    document.getElementById('p2-dist').innerText = p2.steps;
+    document.getElementById('p2-qcount').innerText = p2.questionsAnswered;
+}
+
+function openQuestionBox(player) {
+    let pObj = player === 'p1' ? p1 : p2;
+    let qData = makeMathQuestion();
+    pObj.currentQData = qData;
+
+    document.getElementById(`${player}-quiz`).style.display = 'flex';
+    document.getElementById(`${player}-q-text`).innerText = `To'xtang! Savol yeching:\n${qData.text} = ?`;
+
+    let optionsContainer = document.getElementById(`${player}-q-options`);
+    optionsContainer.innerHTML = '';
+    
+    qData.choices.forEach(opt => {
+        optionsContainer.innerHTML += `<button class="option-btn" onclick="submitAnswer('${player}', ${opt})">${opt}</button>`;
+    });
+}
+
+function submitAnswer(player, chosen) {
+    let pObj = player === 'p1' ? p1 : p2;
+    
+    if (chosen === pObj.currentQData.ans) {
+        pObj.questionsAnswered++;
+        pObj.lock = false; 
+        document.getElementById(`${player}-quiz`).style.display = 'none'; // Savol oynasi muammosiz yopiladi
+        updateLabels();
+    } else {
+        alert("Noto'g'ri javob! To'g'ri javob topilmaguncha yo'l ochilmaydi.");
+    }
+}
+
+function finishRace(winner) {
+    isPlaying = false;
+    let wName = winner === 'p1' ? "1-O'yinchi (QIZIL)" : "2-O'yinchi (YASHIL)";
+    alert(`🏁 MARRA!\n\n🏆 ${wName} 100 qadam bosib va 10 ta savoldan o'tib marraga birinchi yetib keldi!`);
+    
+    document.getElementById("lobby").style.display = "flex";
+    document.getElementById("lobby").querySelector('h1').innerText = `${wName} G'ALABA QOZONDI! 🏆`;
+}
+
+document.getElementById('p1-run-trigger').addEventListener('mouseup', () => executeStep('p1'));
+document.getElementById('p1-run-trigger').addEventListener('touchend', () => executeStep('p1'));
+
+document.getElementById('p2-run-trigger').addEventListener('mouseup', () => executeStep('p2'));
+document.getElementById('p2-run-trigger').addEventListener('touchend', () => executeStep('p2'));
+
+let p1KeyLock = false;
+let p2KeyLock = false;
+
+document.addEventListener('keydown', (e) => {
+    let key = e.key.toUpperCase();
+    if (key === 'A' && !p1KeyLock) { p1KeyLock = true; executeStep('p1'); }
+    if (key === 'L' && !p2KeyLock) { p2KeyLock = true; executeStep('p2'); }
+});
+
+document.addEventListener('keyup', (e) => {
+    let key = e.key.toUpperCase();
+    if (key === 'A') p1KeyLock = false;
+    if (key === 'L') p2KeyLock = false;
+});
+
+    </script>
+
+</body>
+</html>

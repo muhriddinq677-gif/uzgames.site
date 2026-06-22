@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>So'z Topish - Professional 100 Bosqich</title>
+<style>
+ body{ margin:0; background:#f3e6c8; font-family:Arial,sans-serif; text-align:center; user-select:none; touch-action:none; -webkit-user-select: none; }
+ #menu{ padding:15px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap; align-items: center; background: #e6d5b0; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+ .time-group { display: flex; align-items: center; gap: 5px; background: #fff; padding: 5px 10px; border-radius: 5px; border: 1px solid #aaa; }
+ select, button{ padding:8px; font-size:16px; cursor:pointer; border-radius: 4px; border: 1px solid #999; outline: none; }
+ #top{ display:flex; justify-content:space-between; padding:10px 20px; font-weight:bold; background:rgba(0,0,0,0.1); font-size: 18px; }
+ #board{ display:flex; flex-direction:column; gap:10px; margin-top:20px; min-height:120px; max-height: 220px; overflow-y: auto; }
+ .word{ display:flex; justify-content:center; gap:6px; }
+ .slot{ width:40px; height:40px; border-radius:8px; background:#fff; border:2px solid #999; line-height:36px; font-size:22px; color:transparent; font-weight: bold; text-transform: uppercase; }
+ .word.done .slot{ background:#7be495; border-color:#2e7d32; color:#000; transition: 0.3s; box-shadow: 0 0 8px rgba(123,228,149,0.5); }
+ #wheel-wrapper { position: relative; width:280px; height:280px; margin:40px auto; }
+ #wheel{ position:absolute; inset:0; border-radius:50%; background:#5865f2; box-shadow: 0 10px 20px rgba(0,0,0,0.2); z-index: 2; }
+ .letter{ position:absolute; width:50px; height:50px; border-radius:50%; background:#1c2340; color:#fff; font-size:24px; line-height:46px; z-index:5; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; pointer-events: auto; transition: transform 0.1s; }
+ .letter.used{ background: #e94560; transform: scale(1.1); box-shadow: 0 0 10px rgba(233,69,96,0.6); }
+ canvas{ position:absolute; inset:0; pointer-events:none; z-index:3; }
+</style>
+</head>
+<body>
+
+<div id="menu">
+ <select id="lang" onchange="loadLevel()">
+  <option value="uz">O‘zbek</option>
+  <option value="en">English</option>
+  <option value="ru">Русский</option>
+  <option value="ar">العربية</option>
+  <option value="fr">Français</option>
+ </select>
+
+ <div class="time-group">
+  <select id="hSel" title="Soat"></select> :
+  <select id="mSel" title="Minut"></select> :
+  <select id="sSel" title="Sekund"></select>
+ </div>
+
+ <button onclick="startGame()" style="background: #2e7d32; color: white; border: none; padding: 8px 20px; font-weight: bold;">Boshlash</button>
+</div>
+
+<div id="top">
+ <div>Bosqich: <span id="level">1</span>/100</div>
+ <div>⏱ <span id="timeDisplay">00:00:00</span></div>
+ <div>⭐ <span id="score">0</span></div>
+</div>
+
+<div id="board"></div>
+
+<div id="wheel-wrapper">
+ <div id="wheel"></div>
+ <canvas id="c" width="280" height="280"></canvas>
+</div>
+
+<script>
+// Vaqt tanlagichlarini to'ldirish
+const fillSel = (id, max, def) => {
+    let s = document.getElementById(id);
+    for(let i=0; i<=max; i++){
+        let opt = document.createElement("option");
+        opt.value = i;
+        opt.innerText = i < 10 ? "0" + i : i;
+        if(i === def) opt.selected = true;
+        s.appendChild(opt);
+    }
+};
+fillSel("hSel", 23, 0); fillSel("mSel", 59, 5); fillSel("sSel", 59, 0);
+
+// Professional va Kengaytirilgan So'zlar Bazasi (Har bir tilda 6 harfligacha yetarli so'zlar bor)
+const WORDS={
+ uz:["UY","IN","IZ","OY","OL","NON","SUV","KUN","OSH","LAB","TIL","QON","TUZ","BOLA","OLMA","YO‘L","OYNA","DARA","QUSH","BARG","MEVA","STOL","SOAT","KO‘Z","QO‘L","OYOQ","BOSH","RANG","KITOB","DO‘ST","TOG‘","ESHIK","TIL","YURAK","SUYAK","KULGI","OVOZ","SO‘Z","SHAKAR","DAFTAR","MAKTAB","YULDUZ","DENGIZ","SABZI","GURUCH","CHIROQ","HIKOYA","VATAN","QALB","ZAMIN","QUYOSH","TUPROQ","GULZAR","ZAFAR","BILIM","CHAMAN","BULBUL","SULTON"],
+ en:["UP","IT","GO","BY","MY","SUN","DAY","FLY","BOY","CAT","DOG","BOOK","TREE","ROAD","STAR","MOON","SEA","BIRD","FOOD","HAND","FOOT","EYE","NOSE","FACE","GAME","KING","WALK","LOVE","APPLE","HOUSE","WATER","BREAD","TABLE","CHAIR","PHONE","TIME","NIGHT","MUSIC","WORD","COLOR","GREEN","BLUE","HAPPY","HEART","WORLD","QUEEN","FAMILY","ORANGE","YELLOW","BANNER"],
+ ru:["ДОМ","КОТ","ЛЕС","ЕЖ","УЖ","ЗА","ВОДА","ХЛЕБ","НЕБО","РУКА","НОГА","ГЛАЗ","ДЕНЬ","НОЧЬ","СВЕТ","УХО","ЯЗЫК","ГРИБ","МЕЛ","ОКНО","ДРУГ","СТОЛ","СТУЛ","МОРЕ","РЕКА","ИГРА","ЦВЕТ","ЛИЦО","ЗУБЫ","ГОРОД","ЖИЗНЬ","КНИГА","СОЛНЦЕ","ОБЛАКО","СТРАНА","МАШИНА","ЦВЕТОК"],
+ ar:["أب","أم","يد","هو","في","ماء","خبز","نجم","قمر","عين","أنف","فم","قلب","بيت","شمس","بحر","نور","وقت","يوم","ليل","صوت","لون","كتاب","شجرة","طريق","تفاح","طاولة","كرسي","هاتف","موسيقى"],
+ fr:["UN","LE","LA","EN","ET","EAU","AMI","MOT","JEU","MER","VERT","MAIN","PIED","TETE","OEIL","NEZ","PAIN","JOUR","NUIT","BLEU","CHAIR","COEUR","FACE","LIVRE","ARBRE","ROUTE","POMME","MAISON","TABLE","CHAISE"]
+};
+
+let level=1, score=0, totalSeconds=0, timer=null;
+let levelWords=[], selected=[], used=new Set(), dragging=false, coords=[];
+let usedWordsInGame = new Set(); // O'yinda bir marta ishlatilgan so'zlarni eslab qolish uchun
+
+const canvas=document.getElementById("c");
+const ctx=canvas.getContext("2d");
+
+function formatTime(s) {
+    let h = Math.floor(s / 3600);
+    let m = Math.floor((s % 3600) / 60);
+    let sec = s % 60;
+    return [h, m, sec].map(v => v < 10 ? "0" + v : v).join(":");
+}
+
+function startGame(){
+ clearInterval(timer);
+ score=0; level=1;
+ usedWordsInGame.clear(); // Yangi o'yin boshlanganda so'zlar ro'yxati tozalanadi
+ document.getElementById("score").innerText=0;
+ 
+ let h = parseInt(document.getElementById("hSel").value);
+ let m = parseInt(document.getElementById("mSel").value);
+ let s = parseInt(document.getElementById("sSel").value);
+ totalSeconds = (h * 3600) + (m * 60) + s;
+
+ if(totalSeconds <= 0) { alert("Vaqtni tanlang!"); return; }
+
+ document.getElementById("timeDisplay").innerText = formatTime(totalSeconds);
+ timer = setInterval(() => {
+  totalSeconds--;
+  document.getElementById("timeDisplay").innerText = formatTime(totalSeconds);
+  if(totalSeconds <= 0){
+      clearInterval(timer);
+      dragging = false;
+      alert("Vaqt tugadi! Umumiy ball: " + score);
+      resetSelection();
+  }
+ }, 1000);
+ loadLevel();
+}
+
+function splitWord(word) {
+    let result = [];
+    for(let i=0; i<word.length; i++) {
+        let char = word[i];
+        if((char === 'O' || char === 'G') && (word[i+1] === '‘' || word[i+1] === "'" || word[i+1] === '`')) {
+            char += '‘';
+            i++;
+        }
+        result.push(char);
+    }
+    return result;
+}
+
+function loadLevel(){
+ resetSelection();
+ if (level > 100) {
+     clearInterval(timer);
+     alert("Tabriklaymiz! Siz barcha 100 ta darajani muvaffaqiyatli yutdingiz!");
+     return;
+ }
+ document.getElementById("level").innerText = level;
+ const lang = document.getElementById("lang").value;
+ 
+ // Faqat ushbu o'yinda hali takrorlanmagan so'zlarni olish
+ const pool = [...WORDS[lang]].filter(w => !usedWordsInGame.has(w));
+ 
+ // MATEMATIK ASOSLANGAN 100 BOSQICHLI QIYINLASHUV DINAMIKASI
+ // 1-bosqichda 2 xonali 1 ta so'z, 5-bosqichda 2 xonali 2 ta so'z... 100-bosqichda 6 xonali 6 ta so'z.
+ let maxWordLength = 2;
+ let wordCount = 1;
+
+ if (level <= 4) { maxWordLength = 2; wordCount = 1; }
+ else if (level <= 8) { maxWordLength = 2; wordCount = 2; }
+ else if (level <= 15) { maxWordLength = 3; wordCount = 2; }
+ else if (level <= 25) { maxWordLength = 3; wordCount = 3; }
+ else if (level <= 40) { maxWordLength = 4; wordCount = 3; }
+ else if (level <= 60) { maxWordLength = 4; wordCount = 4; }
+ else if (level <= 75) { maxWordLength = 5; wordCount = 4; }
+ else if (level <= 85) { maxWordLength = 5; wordCount = 5; }
+ else if (level <= 95) { maxWordLength = 6; wordCount = 5; }
+ else { maxWordLength = 6; wordCount = 6; } // Maksimal 6 xonali 6 ta so'z
+
+ // So'zlarni harf uzunligiga qarab saralash
+ let filtered = pool.filter(w => splitWord(w).length === maxWordLength);
+ 
+ // Agar o'sha harf o'lchamida takrorlanmagan so'z qolmagan bo'lsa, zaxiradan oladi
+ if(filtered.length === 0) {
+     filtered = [...WORDS[lang]].filter(w => splitWord(w).length === maxWordLength);
+ }
+ if(filtered.length === 0) filtered = [...WORDS[lang]]; // Favqulodda xavfsizlik holati
+
+ // G'ildirak yasash uchun bitta asosiy baza so'z tanlanadi
+ let baseWord = filtered[Math.floor(Math.random() * filtered.length)];
+ levelWords = [baseWord];
+ usedWordsInGame.add(baseWord);
+
+ let baseLetters = splitWord(baseWord);
+ let safety = 0;
+
+ // Baza so'zining harflaridan tuzish mumkin bo'lgan qo'shimcha takrorlanmas so'zlarni qidirish
+ while(levelWords.length < wordCount && safety < 500) {
+     let randomWord = pool[Math.floor(Math.random() * pool.length)];
+     if(randomWord && !levelWords.includes(randomWord)) {
+         let rLetters = splitWord(randomWord);
+         // Qo'shimcha so'zning uzunligi asosiy so'zdan oshib ketmasligi kerak va harflari mos kelishi shart
+         if (rLetters.length <= maxWordLength) {
+             let isMatch = rLetters.every(l => baseLetters.includes(l));
+             if(isMatch) {
+                 levelWords.push(randomWord);
+                 usedWordsInGame.add(randomWord);
+             }
+         }
+     }
+     safety++;
+ }
+
+ drawBoard();
+ // G'ildirak kataklari va harflar har doim 100% bir xil va mos chiqadi
+ drawWheel(shuffle([...baseLetters]));
+}
+
+function drawBoard(){
+ const b = document.getElementById("board");
+ b.innerHTML = "";
+ levelWords.forEach(w => {
+  const d = document.createElement("div");
+  d.className = "word";
+  d.dataset.word = w;
+  let chars = splitWord(w);
+  for(let i=0; i<chars.length; i++) d.appendChild(document.createElement("div")).className = "slot";
+  b.appendChild(d);
+ });
+}
+
+function drawWheel(letters){
+ const w = document.getElementById("wheel");
+ w.innerHTML = '<canvas id="c" width="280" height="280"></canvas>';
+ 
+ const canvas = document.getElementById("c");
+ window.ctx = canvas.getContext("2d");
+
+ const r = 100, c = 140; // Sizning original 100 radiusli ajoyib proporsiyangiz
+ letters.forEach((l, i) => {
+  const a = 2 * Math.PI / letters.length * i;
+  const d = document.createElement("div");
+  d.className = "letter";
+  d.innerText = l;
+  d.style.left = c + r * Math.cos(a) - 25 + "px";
+  d.style.top = c + r * Math.sin(a) - 25 + "px";
+  w.appendChild(d);
+ });
+}
+
+// EKRAM SURILMAYDIGAN PROFESSIONAL SENSOR NAZORATI (SMARTFONLAR UCHUN)
+function handlePointerDown(e) {
+    if(totalSeconds <= 0 && timer !== null) return;
+    let target = e.target.closest('.letter');
+    if(target) {
+        dragging = true;
+        coords = [];
+        used.clear();
+        selected = [];
+        if(window.ctx) window.ctx.clearRect(0,0,280,280);
+        pickLetter(target);
+    }
+}
+
+function handlePointerMove(e) {
+    if(!dragging) return;
+    e.preventDefault(); 
+    
+    let clientX = e.clientX || (e.touches && e.touches.clientX);
+    let clientY = e.clientY || (e.touches && e.touches.clientY);
+    
+    if(!clientX || !clientY) return;
+
+    let element = document.elementFromPoint(clientX, clientY);
+    if(element) {
+        let letterEl = element.closest('.letter');
+        if(letterEl && !used.has(letterEl)) {
+            pickLetter(letterEl);
+        }
+    }
+    drawLines(clientX, clientY);
+}
+
+function handlePointerUp() {
+    if(dragging) checkWord();
+    dragging = false;
+}
+
+const wContainer = document.getElementById("wheel-wrapper");
+wContainer.addEventListener("mousedown", handlePointerDown);
+wContainer.addEventListener("touchstart", handlePointerDown, {passive: false});
+
+window.addEventListener("mousemove", handlePointerMove, {passive: false});
+window.addEventListener("touchmove", handlePointerMove, {passive: false});
+
+window.addEventListener("mouseup", handlePointerUp);
+window.addEventListener("touchend", handlePointerUp);
+
+function pickLetter(el) {
+    if(used.has(el)) return;
+    used.add(el);
+    el.classList.add("used");
+    selected.push(el.innerText);
+    
+    let cx = el.offsetLeft + 25;
+    let cy = el.offsetTop + 25;
+    coords.push({x: cx, y: cy});
+}
+
+function drawLines(currentX, currentY) {
+    let canvasEl = document.getElementById("c");
+    if(!window.ctx || !canvasEl) return;
+    
+    window.ctx.clearRect(0,0,280,280);
+    window.ctx.strokeStyle = "rgba(255,255,255,0.8)"; 
+    window.ctx.lineWidth = 6;
+    window.ctx.lineCap = "round";
+    window.ctx.lineJoin = "round";
+    
+    if(coords.length === 0) return;
+    
+    window.ctx.beginPath();
+    window.ctx.moveTo(coords.x, coords.y);
+    
+    for(let i=1; i<coords.length; i++) {
+        window.ctx.lineTo(coords[i].x, coords[i].y);
+    }
+    
+    if(currentX && currentY) {
+        let rect = canvasEl.getBoundingClientRect();
+        let mx = currentX - rect.left;
+        let my = currentY - rect.top;
+                if(mx >= 0 && mx <= 280 && my >= 0 && my <= 280) {
+            window.ctx.lineTo(mx, my);
+        }
+    }
+    window.ctx.stroke();
+}
+
+function checkWord(){
+ const w = selected.join("");
+ 
+ document.querySelectorAll(".word").forEach(row => {
+  if(row.dataset.word === w && !row.classList.contains("done")){
+   row.classList.add("done");
+   let chars = splitWord(w);
+   [...row.children].forEach((s, i) => s.innerText = chars[i]);
+   score += (chars.length * 10);
+   document.getElementById("score").innerText = score;
+  }
+ });
+ 
+ resetSelection();
+ 
+ let totalDone = document.querySelectorAll(".word.done").length;
+ if(totalDone === levelWords.length && levelWords.length > 0){
+  level++; 
+  setTimeout(loadLevel, 500);
+ }
+}
+
+function resetSelection(){
+ selected = []; 
+ used.clear(); 
+ if(window.ctx) window.ctx.clearRect(0,0,280,280);
+ document.querySelectorAll(".letter").forEach(l => l.classList.remove("used"));
+ coords = [];
+ dragging = false;
+}
+
+const shuffle = a => a.sort(() => Math.random() - 0.5);
+
+// Dastlabki yuklash
+loadLevel();
+
+</script>
+
+</body>
+</html>

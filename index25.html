@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tower Builder </title>
+    <style>
+        /* Responsive dizayn uchun asosiy stillar */
+        body {
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #282c34;
+            font-family: Arial, sans-serif;
+            touch-action: manipulation; /* Mobil qurilmalarda tezkor bosish uchun */
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            height: 80vh;
+            background: #a0d8ef;
+            border: 5px solid #fff;
+            overflow: hidden;
+        }
+
+        .block {
+            position: absolute;
+            height: 40px;
+            background: #ff5722;
+            border: 2px solid #e64a19;
+            box-sizing: border-box;
+        }
+
+        #score {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+            color: #fff;
+            z-index: 10;
+        }
+
+        #message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #fff;
+            background: rgba(0,0,0,0.7);
+            padding: 20px;
+            display: none;
+            z-index: 20;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="score">Ball: 0</div>
+        <div id="message">
+            <h2 id="msg-text">O'yin tugadi!</h2>
+            <button onclick="resetGame()">Qayta boshlash</button>
+        </div>
+    </div>
+
+<script>
+    const container = document.getElementById('game-container');
+    const scoreElement = document.getElementById('score');
+    const message = document.getElementById('message');
+    const msgText = document.getElementById('msg-text');
+
+    let score = 0;
+    let gameActive = true;
+    let currentBlock;
+    let direction = 1; // 1: o'ngga, -1: chapga
+    let speed = 4;
+    let blockWidth = 150;
+    let blockHeight = 40;
+    let currentY = 0;
+    let lastBlock = { x: (container.clientWidth - 150) / 2, width: 150 };
+
+    function createBlock() {
+        if (!gameActive) return;
+
+        currentBlock = document.createElement('div');
+        currentBlock.className = 'block';
+        currentBlock.style.width = blockWidth + 'px';
+        currentBlock.style.left = '0px';
+        
+        // Yangi blokni har doim tepaga qo'shamiz
+        currentY = (score + 1) * blockHeight;
+        currentBlock.style.bottom = currentY + 'px';
+        
+        container.appendChild(currentBlock);
+    }
+
+    function moveBlock() {
+        if (!gameActive || !currentBlock) return;
+
+        let left = parseFloat(currentBlock.style.left);
+        left += speed * direction;
+
+        if (left + blockWidth >= container.clientWidth || left <= 0) {
+            direction *= -1; // Devorga tegsa qaytadi
+        }
+
+        currentBlock.style.left = left + 'px';
+        requestAnimationFrame(moveBlock);
+    }
+
+    function dropBlock() {
+        if (!gameActive) return;
+
+        let left = parseFloat(currentBlock.style.left);
+        
+        // Blokning tushgan joyini hisoblash
+        let overlapStart = Math.max(left, lastBlock.x);
+        let overlapEnd = Math.min(left + blockWidth, lastBlock.x + lastBlock.width);
+        let overlapWidth = overlapEnd - overlapStart;
+
+        if (overlapWidth <= 0) {
+            gameOver();
+            return;
+        }
+
+        // Blokni qirqish (faqat ustma-ust tushgan qismi qoladi)
+        currentBlock.style.width = overlapWidth + 'px';
+        currentBlock.style.left = overlapStart + 'px';
+        
+        blockWidth = overlapWidth;
+        lastBlock = { x: overlapStart, width: overlapWidth };
+        
+        score++;
+        scoreElement.innerText = "Ball: " + score;
+        speed += 0.2; // Har safar biroz tezlashadi
+
+        // Kamerani yuqoriga surish (vizual effekt)
+        if (score > 5) {
+            container.style.transform = `translateY(${(score - 5) * blockHeight}px)`;
+        }
+
+        createBlock();
+    }
+
+    function gameOver() {
+        gameActive = false;
+        message.style.display = 'block';
+        msgText.innerText = "O'yin tugadi! Ball: " + score;
+    }
+
+    function resetGame() {
+        location.reload(); // Oddiyroq bo'lishi uchun sahifani yangilaymiz
+    }
+
+    // Sichqoncha yoki ekranni bosganda blok tushadi
+    window.addEventListener('mousedown', dropBlock);
+    window.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        dropBlock();
+    });
+
+    // O'yinni boshlash
+    lastBlock.x = (container.clientWidth - 150) / 2;
+    let base = document.createElement('div');
+    base.className = 'block';
+    base.style.width = '150px';
+    base.style.left = lastBlock.x + 'px';
+    base.style.bottom = '0px';
+    container.appendChild(base);
+
+    createBlock();
+    moveBlock();
+
+</script>
+</body>
+</html>

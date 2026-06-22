@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Archer  Squad Battle</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #1a1a1a; font-family: 'Arial', sans-serif; touch-action: none; }
+        canvas { display: block; background: linear-gradient(#4facfe 0%, #00f2fe 100%); }
+        #ui { position: absolute; top: 15px; left: 15px; color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); pointer-events: none; z-index: 10; width: calc(100% - 30px); }
+        .stats { background: rgba(0,0,0,0.5); padding: 12px; border-radius: 12px; border: 2px solid rgba(255,255,255,0.3); display: inline-block; }
+        #level-up { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; font-size: 35px; display: none; font-weight: bold; background: rgba(0,0,0,0.8); padding: 25px; border-radius: 20px; text-align: center; border: 2px solid gold; }
+        #game-over { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); color: white; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 20; }
+        button { padding: 15px 35px; font-size: 22px; cursor: pointer; background: #2ed573; color: white; border: none; border-radius: 10px; margin-top: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .wind-box { color: #ffeb3b; font-weight: bold; }
+    </style>
+</head>
+<body>
+<button 
+    onclick="window.location.href='index.html'"
+    style="
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: clamp(8px, 2vw, 12px) clamp(15px, 4vw, 25px);
+        font-size: clamp(14px, 2.5vw, 18px);
+        background-color: #ff4757;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-family: sans-serif;
+        font-weight: 600;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        transition: all 0.3s ease;
+        z-index: 9999;
+    "
+    onmouseover="this.style.backgroundColor='#ff6b81'; this.style.transform='scale(1.05)';"
+    onmouseout="this.style.backgroundColor='#ff4757'; this.style.transform='scale(1)';"
+>
+    Chiqish
+</button>
+
+<div id="ui">
+    <div class="stats">
+    
+        <div style="font-size: 22px; color: #00ff88;">BOSQICH: <span id="lvl">1</span></div>
+        <div id="hp-display" style="font-size: 24px; margin: 8px 0;">❤️❤️❤️❤️❤️</div>
+        <div class="wind-box">SHAMOL: <span id="wind-val">0</span> m/s</div>
+    </div>
+</div>
+
+<div id="level-up">KEYINGI <span style="color:red;">LEVEL!</span><br> 🏹 </div>
+
+<div id="game-over">
+    <h1 style="color: #ff4757; font-size: 45px;">MAG'LUBIYAT!</h1>
+    <p style="font-size: 20px;">Siz <span id="final-lvl">1</span>-bosqichgacha bordingiz.</p>
+    <button onclick="location.reload()">QAYTADAN BOSHLASH</button>
+</div>
+
+<canvas id="game"></canvas>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+let level = 1;
+let lives = 5;
+let wind = 0;
+let isGameOver = false;
+let isTransitioning = false;
+
+const player = { x: 80, y: 0, pulling: false, angle: 0, power: 0, dragStartX: 0, dragStartY: 0 };
+let enemies = [];
+let arrows = [];
+let enemyArrows = [];
+
+// Shamolni har 5 sekundda o'zgartirish
+setInterval(() => {
+    if(!isGameOver && !isTransitioning) {
+        wind = (Math.random() * 2 - 1) * (0.1 + level * 0.02);
+        updateUI();
+    }
+}, 5000);
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    player.y = canvas.height - 120;
+    enemies.forEach((en, i) => {
+        en.x = canvas.width - 100 - (i * 60);
+        en.y = canvas.height - 120 - (i * 40);
+    });
+}
+
+function spawnEnemies() {
+    enemies = [];
+    let count = Math.floor((level - 1) / 5) + 1;
+    for (let i = 0; i < count; i++) {
+        enemies.push({
+            x: canvas.width - 100 - (i * 60),
+            y: canvas.height - 120 - (i * 40),
+            alive: true,
+            lastShot: Date.now() + 1500 + (Math.random() * 3000)
+        });
+    }
+}
+
+function drawStickman(x, y, color, isFlipped = false) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(x, y - 50, 10, 0, Math.PI * 2);
+    ctx.moveTo(x, y - 40); ctx.lineTo(x, y - 10);
+    ctx.moveTo(x, y - 10); ctx.lineTo(x - 10, y);
+    ctx.moveTo(x, y - 10); ctx.lineTo(x + 10, y);
+    ctx.moveTo(x, y - 35); ctx.lineTo(isFlipped ? x - 20 : x + 20, y - 25);
+    ctx.stroke();
+}
+
+function drawPlatform(x, y) {
+    ctx.fillStyle = "#5d4037";
+    ctx.fillRect(x - 35, y, 70, 15);
+    ctx.strokeStyle = "#3e2723";
+    ctx.strokeRect(x - 35, y, 70, 15);
+}
+
+function drawBow(x, y, angle, pull) {
+    ctx.save();
+    ctx.translate(x + 15, y - 35);
+    ctx.rotate(angle);
+    ctx.strokeStyle = "#4b2c20";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(-pull/2, 0, 30, -Math.PI/2, Math.PI/2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, -30); ctx.lineTo(-pull, 0); ctx.lineTo(0, 30);
+    ctx.stroke();
+    
+    if (player.pulling) {
+        ctx.setLineDash([5, 5]);
+        ctx.strokeStyle = "rgba(255,255,255,0.5)";
+        ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(200, 0); ctx.stroke();
+        ctx.setLineDash([]);
+    }
+    ctx.restore();
+}
+
+function update() {
+    if (isGameOver || isTransitioning) return;
+
+    arrows.forEach((a, index) => {
+        a.vx += wind; a.vy += 0.12;
+        a.x += a.vx; a.y += a.vy;
+        a.angle = Math.atan2(a.vy, a.vx);
+
+        enemies.forEach(en => {
+            if (en.alive && Math.hypot(a.x - en.x, a.y - (en.y - 35)) < 28) {
+                en.alive = false;
+                arrows.splice(index, 1);
+            }
+        });
+        if (a.y > canvas.height || a.x > canvas.width || a.x < -100) arrows.splice(index, 1);
+    });
+
+    enemyArrows.forEach((a, index) => {
+        a.vx += wind; a.vy += 0.12;
+        a.x += a.vx; a.y += a.vy;
+        a.angle = Math.atan2(a.vy, a.vx);
+        if (Math.hypot(a.x - player.x, a.y - (player.y - 35)) < 25) {
+            lives--;
+            updateUI();
+            enemyArrows.splice(index, 1);
+            if (lives <= 0) endGame();
+        }
+        if (a.y > canvas.height) enemyArrows.splice(index, 1);
+    });
+
+    enemies.forEach(en => {
+        if (en.alive && Date.now() - en.lastShot > 4500) {
+            let dx = player.x - en.x;
+            let dy = player.y - en.y;
+            // Dushman aniqligi juda past
+            let err = (Math.random() - 0.5) * 20; 
+            enemyArrows.push({
+                x: en.x, y: en.y - 35,
+                vx: (dx / 70) + (wind * -12),
+                vy: (dy / 70) - 5 + err,
+                angle: 0
+            });
+            en.lastShot = Date.now() + (Math.random() * 2000);
+        }
+    });
+
+    if (enemies.length > 0 && enemies.every(en => !en.alive)) nextLevel();
+}
+
+function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#2ed573";
+    ctx.fillRect(0, canvas.height - 30, canvas.width, 30);
+
+    drawPlatform(player.x, player.y);
+    drawStickman(player.x, player.y, "#2f3542");
+    drawBow(player.x, player.y, player.angle, player.power);
+
+    enemies.forEach(en => {
+        if (en.alive) {
+            drawPlatform(en.x, en.y);
+            drawStickman(en.x, en.y, "#eb4d4b", true);
+        }
+    });
+
+    [...arrows, ...enemyArrows].forEach(a => {
+        ctx.save();
+        ctx.translate(a.x, a.y);
+        ctx.rotate(a.angle);
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(-30, 0); ctx.stroke();
+        ctx.restore();
+    });
+
+    update();
+    requestAnimationFrame(render);
+}
+
+function nextLevel() {
+    isTransitioning = true;
+    document.getElementById('level-up').style.display = 'block';
+    setTimeout(() => {
+        level++;
+        spawnEnemies();
+        updateUI();
+        document.getElementById('level-up').style.display = 'none';
+        isTransitioning = false;
+    }, 1800);
+}
+
+function updateUI() {
+    document.getElementById('lvl').innerText = level;
+    document.getElementById('hp-display').innerText = "❤️".repeat(Math.max(0, lives));
+    document.getElementById('wind-val').innerText = (wind * 100).toFixed(1);
+}
+
+function endGame() {
+    isGameOver = true;
+    document.getElementById('final-lvl').innerText = level;
+    document.getElementById('game-over').style.display = 'flex';
+}
+
+function handleStart(e) {
+    if (isGameOver || isTransitioning) return;
+    player.pulling = true;
+    const pos = e.touches ? e.touches[0] : e;
+    player.dragStartX = pos.clientX;
+    player.dragStartY = pos.clientY;
+}
+
+function handleMove(e) {
+    if (!player.pulling) return;
+    const pos = e.touches ? e.touches[0] : e;
+    let dx = pos.clientX - player.dragStartX;
+    let dy = pos.clientY - player.dragStartY;
+    player.angle = Math.atan2(-dy, -dx);
+    // Otish kuchini 2 baravar oshirish (8 o'rniga 4 ga bo'lish)
+    player.power = Math.min(Math.hypot(dx, dy) / 4, 45);
+    if(e.cancelable) e.preventDefault();
+}
+
+function handleEnd() {
+    if (!player.pulling) return;
+    if (player.power > 3) {
+        arrows.push({
+            x: player.x + 20, y: player.y - 35,
+            vx: Math.cos(player.angle) * player.power,
+            vy: Math.sin(player.angle) * player.power,
+            angle: player.angle
+        });
+    }
+    player.pulling = false; player.power = 0;
+}
+
+window.addEventListener('mousedown', handleStart);
+window.addEventListener('mousemove', handleMove);
+window.addEventListener('mouseup', handleEnd);
+window.addEventListener('touchstart', handleStart, {passive: false});
+window.addEventListener('touchmove', handleMove, {passive: false});
+window.addEventListener('touchend', handleEnd);
+window.addEventListener('resize', resize);
+
+resize();
+spawnEnemies();
+updateUI();
+render();
+</script>
+</body>
+</html>

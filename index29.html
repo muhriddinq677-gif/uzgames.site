@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Color Switch </title>
+    <style>
+        body { margin: 0; background: #1a1a1a; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: 'Arial Black', sans-serif; overflow: hidden; touch-action: manipulation; }
+        canvas { background: #111; max-width: 100%; max-height: 100%; border: 3px solid #333; }
+        #ui { position: absolute; top: 5%; text-align: center; width: 100%; pointer-events: none; color: white; z-index: 5; }
+        .score { font-size: 50px; margin: 0; text-shadow: 0 0 10px rgba(0,0,0,0.5); }
+        .level { font-size: 14px; color: #00FBFF; letter-spacing: 1px; }
+        #msg { position: absolute; display: none; text-align: center; background: rgba(0,0,0,0.95); padding: 30px; border-radius: 15px; border: 3px solid #00FBFF; color: white; z-index: 10; width: 80%; max-width: 300px; }
+        button { padding: 15px 30px; font-size: 18px; cursor: pointer; background: #00FBFF; border: none; border-radius: 50px; font-weight: bold; margin-top: 20px; transition: 0.2s; }
+        button:active { transform: scale(0.9); }
+    </style>
+</head>
+<body>
+<button 
+    onclick="window.location.href='index.html'"
+    style="
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: clamp(8px, 2vw, 12px) clamp(15px, 4vw, 25px);
+        font-size: clamp(14px, 2.5vw, 18px);
+        background-color: #ff4757;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-family: sans-serif;
+        font-weight: 600;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        transition: all 0.3s ease;
+        z-index: 9999;
+    "
+    onmouseover="this.style.backgroundColor='#ff6b81'; this.style.transform='scale(1.05)';"
+    onmouseout="this.style.backgroundColor='#ff4757'; this.style.transform='scale(1)';"
+>
+    Chiqish
+</button>
+
+    <div id="ui">
+    
+        <p id="levelDisp" class="level">RANGLAR: 5 TA</p>
+        <h1 id="scoreDisp" class="score">0</h1>
+    </div>
+
+    <div id="msg">
+        <h1 id="msgTitle">YUTQAZDINGIZ!</h1>
+        <p id="msgText">Qayta urinib ko'ring</p>
+        <button onclick="resetGame()">BOSHLASH</button>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisp = document.getElementById('scoreDisp');
+        const levelDisp = document.getElementById('levelDisp');
+        const msg = document.getElementById('msg');
+        const msgTitle = document.getElementById('msgTitle');
+        const msgText = document.getElementById('msgText');
+
+        // Siz so'ragan 10 ta rang nomlari
+        const allColors = ['red', 'blue', 'green', 'yellow', 'white', 'pink', 'gray', 'brown', 'cyan', 'black'];
+        
+        let score, gameRunning, player, circle, activeColors, canScore;
+
+        function resize() {
+            canvas.width = window.innerWidth > 400 ? 400 : window.innerWidth;
+            canvas.height = window.innerHeight > 700 ? 700 : window.innerHeight;
+            if(player) player.x = canvas.width / 2;
+        }
+
+        function init() {
+            resize();
+            score = 0;
+            gameRunning = true;
+            canScore = true;
+            activeColors = allColors.slice(0, 5); // 5 ta rangdan boshlanadi
+            player = { 
+                x: canvas.width / 2, 
+                y: canvas.height - 80, 
+                r: 12, 
+                dy: 0, 
+                color: activeColors[Math.floor(Math.random() * 5)] 
+            };
+            circle = { 
+                x: canvas.width / 2, 
+                y: canvas.height / 2.5, 
+                angle: 0, 
+                speed: 0.03, 
+                r: canvas.width / 4.5 
+            };
+            msg.style.display = 'none';
+            updateUI();
+        }
+
+        function updateUI() {
+            scoreDisp.innerText = score;
+            let count = Math.min(5 + Math.floor(score / 10), 10);
+            levelDisp.innerText = `RANGLAR: ${count} TA`;
+        }
+
+        function draw() {
+            if (!gameRunning) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // To'siq aylanishi
+            circle.angle += circle.speed;
+            let count = Math.min(5 + Math.floor(score / 10), 10);
+            activeColors = allColors.slice(0, count);
+            let slice = (Math.PI * 2) / count;
+
+            for (let i = 0; i < count; i++) {
+                ctx.beginPath();
+                ctx.strokeStyle = activeColors[i];
+                ctx.lineWidth = 18;
+                let start = circle.angle + i * slice;
+                let end = circle.angle + (i + 1) * slice;
+                ctx.arc(circle.x, circle.y, circle.r, start, end);
+                ctx.stroke();
+
+                // To'qnashuv tekshiruvi
+                let dist = Math.hypot(player.x - circle.x, player.y - circle.y);
+                if (dist > circle.r - 15 && dist < circle.r + 15) {
+                    let ballAngle = Math.atan2(player.y - circle.y, player.x - circle.x);
+                    if (ballAngle < 0) ballAngle += Math.PI * 2;
+                    let s = start % (Math.PI * 2); if (s < 0) s += Math.PI * 2;
+                    let e = end % (Math.PI * 2); if (e < 0) e += Math.PI * 2;
+
+                    let isInside = (s < e) ? (ballAngle >= s && ballAngle <= e) : (ballAngle >= s || ballAngle <= e);
+
+                    if (isInside) {
+                        if (player.color === activeColors[i]) {
+                            if (canScore) {
+                                score++;
+                                updateUI();
+                                if (score >= 60) {
+                                    gameOver("G'ALABA! 🎉", "Siz barcha 10 ta rangdan o'tdingiz!");
+                                    return;
+                                }
+                                // Muvaffaqiyatli tegsa: pastga qaytadi va rangi o'zgaradi
+                                player.y = canvas.height - 80;
+                                player.dy = 0;
+                                player.color = activeColors[Math.floor(Math.random() * activeColors.length)];
+                                canScore = false;
+                                setTimeout(() => canScore = true, 400);
+                            }
+                        } else {
+                            gameOver("YUTQAZDINGIZ!", "Rang mos kelmadi!");
+                        }
+                    }
+                }
+            }
+
+            // Koptok fizikasi
+            player.dy += 0.25;
+            player.y += player.dy;
+
+            // Pastga tushib ketish
+            if (player.y > canvas.height + 20) gameOver("YUTQAZDINGIZ!", "Pastga tushib ketdingiz!");
+
+            // O'yinchini chizish
+            ctx.fillStyle = player.color;
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2);
+            ctx.fill();
+            // Koptok atrofiga kichik chiziq (oq yoki qora koptok ko'rinishi uchun)
+            ctx.strokeStyle = "white";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            requestAnimationFrame(draw);
+        }
+
+        function gameOver(t, sub) {
+            gameRunning = false;
+            msg.style.display = 'block';
+            msgTitle.innerText = t;
+            msgTitle.style.color = t.includes("G'ALABA") ? "#00FF00" : "#FF0055";
+            msgText.innerText = sub;
+        }
+
+        function resetGame() {
+            init();
+            draw();
+        }
+
+        // Boshqaruv (Sichqoncha va Sensor)
+        window.addEventListener('mousedown', (e) => { if(gameRunning) player.dy = -5.5; });
+        window.addEventListener('touchstart', (e) => { 
+            if(e.target.tagName !== 'BUTTON') e.preventDefault();
+            if(gameRunning) player.dy = -5.5; 
+        }, {passive: false});
+
+        window.addEventListener('resize', resize);
+
+        init();
+        draw();
+    </script>
+</body>
+</html>

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tosh Qaychi Qog'oz - Mobile Responsive</title>
+    <style>
+        body {
+            background-color: #1a1a1a; color: #fff;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; min-height: 100vh; margin: 0; padding: 10px; box-sizing: border-box;
+        }
+        h1 { margin: 10px 0; font-size: 1.8rem; color: #00ffcc; text-shadow: 0 2px 10px rgba(0, 255, 204, 0.3); text-align: center; }
+        
+        .main-layout { display: flex; flex-direction: column; gap: 15px; max-width: 900px; width: 100%; }
+        .panel { background: #222; padding: 15px; border-radius: 15px; border: 2px solid #333; box-shadow: 0 10px 30px rgba(0,0,0,0.7); box-sizing: border-box; }
+        .game-panel { display: flex; flex-direction: column; align-items: center; width: 100%; }
+        .side-panel { display: flex; flex-direction: column; gap: 15px; width: 100%; }
+        
+        /* Profil va Avatar */
+        .profile-box { background: #2a2a2a; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #444; width: 100%; box-sizing: border-box; }
+        .avatar-container { font-size: 3rem; position: relative; display: inline-block; margin: 15px 0; width: 80px; height: 80px; }
+        .hat-layer { position: absolute; top: -25px; left: 50%; transform: translateX(-50%); font-size: 2.2rem; z-index: 2; min-height: 40px; }
+        .head-layer { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); }
+        .p-coins { color: #ffeb3b; font-weight: bold; font-size: 1.2rem; margin-top: 5px; }
+
+        /* O'yin maydoni va Tugmalar */
+        .score-board { font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; text-align: center; }
+        .choices { display: flex; gap: 12px; margin: 15px 0; justify-content: center; width: 100%; }
+        .choice-btn { font-size: 2.2rem; background: #333; border: 2px solid #555; border-radius: 50%; width: 75px; height: 75px; cursor: pointer; transition: transform 0.2s, border-color 0.2s; -webkit-tap-highlight-color: transparent; }
+        .choice-btn:hover { border-color: #00ffcc; transform: scale(1.05); }
+        
+        .results { display: flex; gap: 15px; margin-bottom: 15px; justify-content: center; width: 100%; }
+        .res-box { background: #111; padding: 10px; border-radius: 8px; flex: 1; max-width: 100px; text-align: center; border: 1px solid #333; }
+        .res-emoji { font-size: 2rem; min-height: 38px; margin-top: 5px; }
+        .status-text { font-size: 1.1rem; font-weight: bold; color: #ffeb3b; min-height: 45px; text-align: center; padding: 0 10px; }
+        
+        /* Do'kon */
+        .shop-title { font-weight: bold; color: #ffeb3b; border-bottom: 1px solid #444; padding-bottom: 5px; margin-bottom: 10px; text-align: center; }
+        .shop-item { display: flex; justify-content: space-between; align-items: center; background: #1a1a1a; padding: 10px 12px; margin: 8px 0; border-radius: 5px; border: 1px solid #333; font-size: 0.95rem; }
+        .buy-btn { padding: 8px 12px; font-size: 0.85rem; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; background: #ffeb3b; color: #000; }
+        .use-btn { padding: 8px 12px; font-size: 0.85rem; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; background: #00ffcc; color: #000; }
+
+        /* Katta ekranlar (Kompyuterlar) uchun moslashuv */
+        @media (min-width: 768px) {
+            body { padding: 20px; }
+            h1 { font-size: 2.2rem; margin-bottom: 20px; }
+            .main-layout { flex-direction: row; gap: 20px; }
+            .game-panel { flex: 2; padding: 20px; }
+            .side-panel { flex: 1.2; padding: 0; }
+            .choice-btn { width: 85px; height: 85px; font-size: 2.6rem; }
+            .res-box { max-width: 110px; }
+            .res-emoji { font-size: 2.4rem; }
+            .status-text { font-size: 1.3rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Tosh, Qaychi, Qog'oz</h1>
+
+    <div class="main-layout">
+        <!-- O'yin oynasi -->
+        <div class="panel game-panel">
+            <div class="score-board">
+                Siz: <span id="pScore" style="color:#00ffcc">0</span> / 5 | 
+                Bot: <span id="cScore" style="color:#ff4444">0</span> / 5
+            </div>
+
+            <div class="choices">
+                <button class="choice-btn" onclick="play('tosh')">✊</button>
+                <button class="choice-btn" onclick="play('qogoz')">✋</button>
+                <button class="choice-btn" onclick="play('qaychi')">✌️</button>
+            </div>
+
+            <div class="results">
+                <div class="res-box">Siz:<div id="pChoice" class="res-emoji">-</div></div>
+                <div class="res-box">Bot:<div id="cChoice" class="res-emoji">-</div></div>
+            </div>
+
+            <div id="statusTxt" class="status-text">Tanlov qiling (Marra: 5 ochko)</div>
+        </div>
+
+        <!-- Profil va Do'kon -->
+        <div class="side-panel">
+            <!-- Profil -->
+            <div class="profile-box">
+                <div style="font-weight: bold;">Sizning Profilingiz</div>
+                <div class="avatar-container">
+                    <div id="currentHat" class="hat-layer"></div>
+                    <div id="currentHead" class="head-layer">👨</div>
+                </div>
+                <div class="p-coins"><span id="coinDisplay">0</span> ochko 🪙</div>
+            </div>
+
+            <!-- Do'kon -->
+            <div class="panel" style="padding: 15px;">
+                <div class="shop-title">Do'kon</div>
+                
+                <!-- Shapkalar -->
+                <div class="shop-item"><span>🤠 Shapka (90 o.)</span><button class="buy-btn" id="btn-hat1" onclick="buyItem('hat', '🤠', 'hat1', 90)">Sotib olish</button></div>
+                <div class="shop-item"><span>👑 Toj (90 o.)</span><button class="buy-btn" id="btn-hat2" onclick="buyItem('hat', '👑', 'hat2', 90)">Sotib olish</button></div>
+                
+                <!-- Kallalar -->
+                <div class="shop-item"><span>🤖 Robot (100 o.)</span><button class="buy-btn" id="btn-head1" onclick="buyItem('head', '🤖', 'head1', 100)">Sotib olish</button></div>
+                <div class="shop-item"><span>👽 Alien (100 o.)</span><button class="buy-btn" id="btn-head2" onclick="buyItem('head', '👽', 'head2', 100)">Sotib olish</button></div>
+            </div>
+        </div>
+    </div>
+
+<script>
+let roundWins = 0;
+let botWins = 0;
+let coins = 0;
+
+let inventory = {
+    hat1: false, hat2: false,
+    head1: false, head2: false
+};
+
+let currentEquippedHat = '';
+let currentEquippedHead = '👨';
+
+const choiceEmojis = { 'tosh': '✊', 'qogoz': '✋', 'qaychi': '✌️' };
+
+function play(playerChoice) {
+    if (roundWins >= 5 || botWins >= 5) {
+        resetMatch();
+        return;
+    }
+
+    const choices = ['tosh', 'qogoz', 'qaychi'];
+    const compChoice = choices[Math.floor(Math.random() * 3)];
+
+    document.getElementById('pChoice').innerText = choiceEmojis[playerChoice];
+    document.getElementById('cChoice').innerText = choiceEmojis[compChoice];
+
+    const status = document.getElementById('statusTxt');
+
+    if (playerChoice === compChoice) {
+        status.innerText = "Durang! 🤝";
+        status.style.color = "#ffeb3b";
+    } else if (
+        (playerChoice === 'tosh' && compChoice === 'qaychi') ||
+        (playerChoice === 'qogoz' && compChoice === 'tosh') ||
+        (playerChoice === 'qaychi' && compChoice === 'qogoz')
+    ) {
+        roundWins++;
+        document.getElementById('pScore').innerText = roundWins;
+        status.innerText = "Raundda yutdingiz! +1 ochko 🎉";
+        status.style.color = "#00ffcc";
+    } else {
+        botWins++;
+        document.getElementById('cScore').innerText = botWins;
+        status.innerText = "Bot yutdi! 🤖";
+        status.style.color = "#ff4444";
+    }
+
+    if (roundWins === 5) {
+        coins += 50;
+        document.getElementById('coinDisplay').innerText = coins;
+        status.innerHTML = "<span style='color:#ffeb3b; font-size:1.2rem; display:block; margin-bottom:5px;'>🏆 MARRA! Siz 5 ochko yig'ib, 50 ochko mukofot oldingiz!</span><span style='font-size:0.85rem; color:#aaa;'>Davom etish uchun ixtiyoriy tugmani bosing.</span>";
+    } else if (botWins === 5) {
+        status.innerHTML = "<span style='color:#ff4444; font-size:1.2rem; display:block; margin-bottom:5px;'>O'yin tugadi! Bot marraga birinchi yetdi.</span><span style='font-size:0.85rem; color:#aaa;'>Qayta urunish uchun ixtiyoriy tugmani bosing.</span>";
+    }
+}
+
+function resetMatch() {
+    roundWins = 0;
+    botWins = 0;
+    document.getElementById('pScore').innerText = '0';
+    document.getElementById('cScore').innerText = '0';
+    document.getElementById('pChoice').innerText = '-';
+    document.getElementById('cChoice').innerText = '-';
+    document.getElementById('statusTxt').innerText = "Yangi o'yin boshlandi! Marra: 5 ochko";
+    document.getElementById('statusTxt').style.color = "#ffeb3b";
+}
+
+function buyItem(type, emoji, id, price) {
+    if (inventory[id]) {
+        toggleEquip(type, emoji);
+        return;
+    }
+
+    if (coins >= price) {
+        coins -= price;
+        inventory[id] = true;
+        document.getElementById('coinDisplay').innerText = coins;
+        
+        const btn = document.getElementById('btn-' + id);
+        btn.innerText = "Kiyish";
+        btn.className = "use-btn";
+        
+        toggleEquip(type, emoji);
+    } else {
+        alert(`Ochko yetarli emas! Sizga kamida ${price} ochko kerak. Marraga birinchi bo'lib yeting va 50 ochko oling!`);
+    }
+}
+
+function toggleEquip(type, emoji) {
+    if (type === 'hat') {
+        if (currentEquippedHat === emoji) {
+            currentEquippedHat = '';
+        } else {
+            currentEquippedHat = emoji;
+        }
+        document.getElementById('currentHat').innerText = currentEquippedHat;
+    } else if (type === 'head') {
+        if (currentEquippedHead === emoji) {
+            currentEquippedHead = '👨';
+        } else {
+            currentEquippedHead = emoji;
+        }
+        document.getElementById('currentHead').innerText = currentEquippedHead;
+    }
+}
+
+</script>
+
+</body>
+</html>

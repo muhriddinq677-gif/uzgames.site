@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Head Soccer Pro</title>
+    <style>
+        :root { --unit: 1vmax; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Arial Black', sans-serif; touch-action: none; user-select: none; }
+        canvas { display: block; background: #1a1a2e; width: 100vw; height: 100vh; }
+        #ui { position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; background: rgba(0,0,0,0.9); z-index: 200; }
+        #menu { background: #222; padding: 20px; border-radius: 20px; width: 90%; max-width: 800px; color: white; border: 4px solid #444; max-height: 90vh; overflow-y: auto; text-align: center; }
+        .section-title { background: #333; padding: 5px; margin: 10px 0; color: #f1c40f; text-transform: uppercase; font-size: 12px; border-radius: 5px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 8px; }
+        .card { background: #111; border: 2px solid #333; border-radius: 8px; cursor: pointer; transition: 0.2s; position: relative; overflow: hidden; height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+        .card.p1-sel { border-color: #3498db; box-shadow: 0 0 10px #3498db; transform: scale(1.05); }
+        .card.p2-sel { border-color: #e74c3c; box-shadow: 0 0 10px #e74c3c; transform: scale(1.05); }
+        .f-preview { position: absolute; inset: 0; z-index: 1; opacity: 0.6; }
+        .team-name { z-index: 2; font-size: 8px; font-weight: bold; background: rgba(0,0,0,0.8); width: 100%; padding: 2px 0; }
+        #hud { position: absolute; top: 10px; width: 100%; display: none; justify-content: center; align-items: center; gap: 15px; z-index: 50; pointer-events: none; }
+        .p-info { display: flex; flex-direction: column; align-items: center; color: white; min-width: 80px; }
+        .p-name { font-size: 9px; color: #f1c40f; }
+        .p-team { font-size: 12px; font-weight: bold; }
+        .score { background: rgba(0,0,0,0.8); color: #fff; padding: 5px 15px; border-radius: 8px; font-size: 22px; border: 2px solid #f1c40f; }
+        
+        /* TUGMALAR JOYLASHUVI (SIZ AYTGANDEK USTMA-UST) */
+        #controls { position: absolute; bottom: 30px; width: 100%; display: none; justify-content: space-between; padding: 0 20px; box-sizing: border-box; z-index: 250; }
+        .ctrl-group { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        .btn-row { display: flex; gap: 10px; }
+        .ctrl-btn { width: 12vw; height: 12vw; max-width: 55px; max-height: 55px; background: rgba(255,255,255,0.2); border: 2px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; cursor: pointer; touch-action: none; }
+        .k-btn { background: rgba(231, 76, 60, 0.5); border-color: #e74c3c; }
+
+        #goal { position: absolute; top: 30%; width: 100%; text-align: center; color: #f1c40f; font-size: 15vw; font-weight: 900; display: none; z-index: 100; text-shadow: 4px 4px #000; }
+        #exit { position: absolute; top: 10px; left: 10px; background: #e74c3c; color: white; padding: 5px 10px; border-radius: 5px; cursor: pointer; display: none; z-index: 300; font-size: 12px; }
+    </style>
+</head>
+<body>
+<div id="exit" onclick="location.reload()">EXIT</div>
+<div id="hud">
+    <div class="p-info"><div class="p-team" id="p1t"></div><div class="p-name" id="p1n"></div></div>
+    <div class="score" id="s1">0</div><div class="score" id="tm">45</div><div class="score" id="s2">0</div>
+    <div class="p-info"><div class="p-team" id="p2t"></div><div class="p-name" id="p2n"></div></div>
+</div>
+<div id="goal">GOAL!</div>
+
+<div id="controls">
+    <div class="ctrl-group">
+        <div class="btn-row">
+            <div class="ctrl-btn" onmousedown="mD('w')" onmouseup="mU('w')" ontouchstart="mD('w')" ontouchend="mU('w')">W</div>
+            <div class="ctrl-btn k-btn" onmousedown="mD('f')" onmouseup="mU('f')" ontouchstart="mD('f')" ontouchend="mU('f')">F</div>
+        </div>
+        <div class="btn-row">
+            <div class="ctrl-btn" onmousedown="mD('a')" onmouseup="mU('a')" ontouchstart="mD('a')" ontouchend="mU('a')">A</div>
+            <div class="ctrl-btn" onmousedown="mD('d')" onmouseup="mU('d')" ontouchstart="mD('d')" ontouchend="mU('d')">D</div>
+        </div>
+    </div>
+    <div class="ctrl-group">
+        <div class="btn-row">
+            <div class="ctrl-btn" onmousedown="mD('u')" onmouseup="mU('u')" ontouchstart="mD('u')" ontouchend="mU('u')">↑</div>
+            <div class="ctrl-btn k-btn" onmousedown="mD('m')" onmouseup="mU('m')" ontouchstart="mD('m')" ontouchend="mU('m')">M</div>
+        </div>
+        <div class="btn-row">
+            <div class="ctrl-btn" onmousedown="mD('l')" onmouseup="mU('l')" ontouchstart="mD('l')" ontouchend="mU('l')">←</div>
+            <div class="ctrl-btn" onmousedown="mD('r')" onmouseup="mU('r')" ontouchstart="mD('r')" ontouchend="mU('r')">→</div>
+        </div>
+    </div>
+</div>
+
+<div id="ui">
+    <div id="menu">
+        <h1 style="color:#f1c40f; margin:0; font-size: 35px;">HEAD SOCCER</h1>
+        <div style="margin: 15px 0;">
+            <button onclick="setMode(1)" id="m1-btn" style="background:#2ecc71; color:white; padding:10px 20px; border:none; cursor:pointer; font-weight:bold;">1 PLAYER</button>
+            <button onclick="setMode(2)" id="m2-btn" style="background:#444; color:white; padding:10px 20px; border:none; cursor:pointer; font-weight:bold;">2 PLAYER</button>
+        </div>
+        <h3 id="info">PLAYER 1 TANLANG</h3>
+        <div class="section-title">Davlatlar</div><div class="grid" id="countries"></div>
+        <div class="section-title">Klublar</div><div class="grid" id="clubs"></div>
+        <button onclick="confSelection()" style="padding:15px; width:100%; margin-top:20px; background:#3498db; color:white; font-weight:bold; border-radius:10px; cursor:pointer; border:none;">TANLASH</button>
+    </div>
+</div>
+<canvas id="game"></canvas>
+
+<script>
+const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+let mode = 1, turn = 1, p1Data = null, p2Data = null, gameActive = false, timer = 45;
+
+const players = {'UZBEKISTON':'Eldor Shomurodov','PORTUGAL':'Cristiano Ronaldo','JAPAN':'Kubo','SAUDIYA ARABISTON':'Al-Dawsari','ARGENTINA':'Messi','BRAZIL':'Neymar Jr','GERMANY':'Toni Kross','USA':'Pulisic','ENGLAND':'Bellingham','FRANCE':'Mbappe','Real Madrid':'Vinicius Jr','Surxon':'A. Jumaev','Nasaf':'A.Nematov','Paxtakor':'Igor Sergeyev','Manchester City':'Haaland va Husanov','Al-Nasr':'Mane','Liverpool':'Salah','Manchester United':'Rashford','Milan':'Modric','Inter':'Lautaro'};
+const teams = Object.keys(players);
+
+function drawF(ctx, x, y, w, h, id) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.clip();
+    ctx.fillStyle = 'white';
+    ctx.fillRect(x, y, w, h);
+
+    if (id === 'Real Madrid') {
+        ctx.fillStyle = 'white';
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = 'gold';
+        ctx.lineWidth = h / 12;
+        ctx.beginPath();
+        ctx.arc(x + w / 2, y + h / 2 + h / 10, h / 3.8, 0, 7);
+        ctx.stroke();
+        ctx.strokeStyle = 'darkblue';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(x + w / 2, y + h / 2 + h / 10, h / 3.2, 0, 7);
+        ctx.stroke();
+        ctx.strokeStyle = 'darkblue';
+        ctx.lineWidth = h / 9;
+        ctx.beginPath();
+        ctx.moveTo(x + w * 0.35, y + h * 0.38);
+        ctx.lineTo(x + w * 0.65, y + h * 0.82);
+        ctx.stroke();
+        ctx.fillStyle = 'gold';
+        ctx.strokeStyle = 'darkblue';
+        ctx.lineWidth = 1;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.font = 'bold ' + (h / 2.5) + 'px serif';
+        ctx.strokeText('M', x + w / 2, y + h / 2 + h / 6);
+        ctx.fillText('M', x + w / 2, y + h / 2 + h / 6);
+        ctx.font = 'bold ' + (h / 3.2) + 'px serif';
+        ctx.strokeText('C', x + w / 2, y + h / 2 + h / 6);
+        ctx.fillText('C', x + w / 2, y + h / 2 + h / 6);
+        ctx.font = 'bold ' + (h / 6.5) + 'px serif';
+        ctx.strokeText('F', x + w / 2, y + h / 2 + h / 6);
+        ctx.fillText('F', x + w / 2, y + h / 2 + h / 6);
+        ctx.font = (h / 3.2) + 'px Arial';
+        ctx.fillText('👑', x + w / 2, y + h / 4.2);
+    } 
+    else if (id === 'UZBEKISTON') {
+        ctx.fillStyle = 'deepskyblue';
+        ctx.fillRect(x, y, w, h / 3);
+        ctx.fillStyle = 'white';
+        ctx.fillRect(x, y + h / 3, w, h / 3);
+        ctx.fillStyle = 'green';
+        ctx.fillRect(x, y + 2 * h / 3, w, h / 3);
+        ctx.fillStyle = 'red';
+        ctx.fillRect(x, y + h / 3 - 1, w, 2);
+        ctx.fillRect(x, y + 2 * h / 3 - 1, w, 2);
+        ctx.fillStyle = 'white';
+        ctx.font = (h / 4) + 'px Arial';
+        ctx.textAlign = "left";
+        ctx.fillText('🌙', x + w * 0.1, y + h / 4.2);
+        let s = h / 45;
+        for (let i = 0; i < 3; i++) ctx.fillRect(x + w * 0.35, y + h / 10 + i * s * 2.5, s, s);
+        for (let i = 0; i < 4; i++) ctx.fillRect(x + w * 0.42, y + h / 15 + i * s * 2.5, s, s);
+        for (let i = 0; i < 5; i++) ctx.fillRect(x + w * 0.49, y + h / 25 + i * s * 2.5, s, s);
+    } 
+    else if (id === 'Al-Nasr') {
+        ctx.fillStyle = 'yellow';
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = 'blue';
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.arc(x + w / 2, y + h / 2 + 8, h / 2.5, 0, 7);
+        ctx.stroke();
+        ctx.font = (h / 3.5) + 'px Arial';
+        ctx.textAlign = "center";
+        ctx.fillText('👑', x + w / 2, y + h / 4);
+        ctx.fillStyle = 'blue';
+        ctx.font = 'bold ' + (h / 8) + 'px Arial';
+        ctx.fillText('AL NASSR', x + w / 2, y + h * 0.85);
+    } 
+    else if (id === 'Nasaf') {
+        ctx.fillStyle = 'red';
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.moveTo(x + w * 0.25, y + h * 0.15);
+        ctx.lineTo(x + w * 0.75, y + h * 0.15);
+        ctx.lineTo(x + w * 0.75, y + h * 0.6);
+        ctx.quadraticCurveTo(x + w / 2, y + h * 0.9, x + w * 0.25, y + h * 0.6);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = 'yellow';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+        ctx.fillStyle = 'blue';
+        ctx.textAlign = "center";
+        ctx.font = 'bold ' + (h / 2.5) + 'px serif';
+        ctx.fillText('N', x + w / 2, y + h / 2 + h / 8);
+        ctx.font = '900 ' + (h / 15) + 'px Arial';
+        ctx.fillText('NASAF', x + w / 2, y + h * 0.3);
+    } 
+    else if (id === 'USA') {
+        ctx.fillStyle = 'red';
+        for (let i = 0; i < 13; i++) if (i % 2 == 0) ctx.fillRect(x, y + i * (h / 13), w, h / 13);
+        ctx.fillStyle = 'darkblue';
+        ctx.fillRect(x, y, w * 0.45, (h / 13) * 7);
+        ctx.fillStyle = 'white';
+        for (let i = 0; i < 5; i++) for (let j = 0; j < 6; j++) ctx.fillRect(x + 5 + j * (w / 15), y + 5 + i * (h / 20), 2, 2);
+    } 
+    else if (id === 'SAUDIYA ARABISTON') {
+        ctx.fillStyle = 'green';
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold ' + (h / 5) + 'px Arial';
+        ctx.textAlign = "center";
+        ctx.fillText('لا إله إلا الله', x + w / 2, y + h * 0.45);
+        ctx.fillRect(x + w * 0.25, y + h * 0.65, w * 0.5, h / 25);
+    } 
+    else if (id === 'Paxtakor') {
+        ctx.fillStyle = '#0054a6';
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = '#fdb913';
+        ctx.lineWidth = h / 12;
+        ctx.beginPath();
+        ctx.arc(x + w / 2, y + h / 2, h / 2.5, 0, 7);
+        ctx.stroke();
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold ' + (h / 9) + 'px Arial';
+        ctx.textAlign = "center";
+        ctx.fillText('PAXTAKOR', x + w / 2, y + h / 2);
+        ctx.fillText('1956', x + w / 2, y + h / 2 + h / 5);
+    } 
+    else if (id === 'Manchester City') {
+        ctx.fillStyle = '#6cadde';
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(x + w / 2, y + h / 2, h / 2.2, 0, 7);
+        ctx.fill();
+        ctx.strokeStyle = '#1c2c5b';
+        ctx.lineWidth = h / 20;
+        ctx.beginPath();
+        ctx.arc(x + w / 2, y + h / 2, h / 2.6, 0, 7);
+        ctx.stroke();
+        ctx.font = (h / 2.5) + 'px Arial';
+        ctx.textAlign = "center";
+        ctx.fillText('🚢', x + w / 2, y + h / 2 + h / 10);
+    } 
+    else if (id === 'Liverpool') {
+        ctx.fillStyle = 'red';
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(x + 5, y + 5, w - 10, h - 10);
+        ctx.textAlign = "center";
+        ctx.font = (h / 2) + 'px Arial';
+        ctx.fillText('🦅', x + w / 2, y + h / 2 + h / 6);
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold ' + (h / 10) + 'px Arial';
+        ctx.fillText('L.F.C.', x + w / 2, y + h * 0.9);
+    } 
+    else if (id === 'Manchester United') {
+        ctx.fillStyle = 'red';
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = 'yellow';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(x + 15, y + h / 2);
+        ctx.lineTo(x + w - 15, y + h / 2);
+        ctx.stroke();
+        ctx.fillStyle = 'yellow';
+        ctx.font = 'bold ' + (h / 9) + 'px Arial';
+        ctx.textAlign = "center";
+        ctx.fillText('MANCHESTER UNITED', x + w / 2, y + h / 2 + h / 4);
+        ctx.font = (h / 3) + 'px Arial';
+        ctx.fillText('🔱', x + w / 2, y + h / 2);
+    } 
+    else if (id === 'Surxon') {
+        ctx.fillStyle = 'yellow';
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = 'blue';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(x + 5, y + 5, w - 10, h - 10);
+        ctx.font = (h / 2.5) + 'px Arial';
+        ctx.textAlign = "center";
+        ctx.fillText('🐎', x + w / 2, y + h / 2 + 5);
+        ctx.fillStyle = 'blue';
+        ctx.font = 'bold ' + (h / 8) + 'px Arial';
+        ctx.fillText('SURXON', x + w / 2, y + h * 0.85);
+    } 
+    else if (id === 'Milan' || id === 'Inter') {
+        ctx.fillStyle = (id === 'Milan') ? 'red' : 'blue';
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = 'black';
+        for (let i = 0; i < w; i += w / 5) ctx.fillRect(x + i, y, w / 10, h);
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold ' + (h / 4) + 'px Arial';
+        ctx.textAlign = "center";
+        ctx.fillText(id === 'Milan' ? 'ACM' : 'IM', x + w / 2, y + h / 2 + h / 10);
+    } 
+    else if (id === 'ENGLAND' || id === 'FRANCE') {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x + w / 2, y + h / 2, h / 2.1, 0, 7);
+        ctx.clip();
+        ctx.fillStyle = 'white';
+        ctx.fillRect(x, y, w, h);
+        if (id === 'ENGLAND') {
+            ctx.fillStyle = 'red';
+            ctx.fillRect(x + w / 2 - 8, y, 16, h);
+            ctx.fillRect(x, y + h / 2 - 8, w, 16);
+        } else {
+            ctx.fillStyle = 'darkblue';
+            ctx.fillRect(x, y, w / 3, h);
+            ctx.fillStyle = 'white';
+            ctx.fillRect(x + w / 3, y, w / 3, h);
+            ctx.fillStyle = 'red';
+            ctx.fillRect(x + 2 * w / 3, y, w / 3, h);
+        }
+        ctx.restore();
+        ctx.strokeStyle = 'lightgrey';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(x + w / 2, y + h / 2, h / 2.1, 0, 7);
+        ctx.stroke();
+    } 
+    else if (id === 'PORTUGAL') {
+        ctx.fillStyle = 'green';
+        ctx.fillRect(x, y, w * 0.4, h);
+        ctx.fillStyle = 'red';
+        ctx.fillRect(x + w * 0.4, y, w * 0.6, h);
+        ctx.fillStyle = 'yellow';
+        ctx.beginPath();
+        ctx.arc(x + w * 0.4, y + h / 2, h / 5, 0, 7);
+        ctx.fill();
+    } 
+    else if (id === 'BRAZIL') {
+        ctx.fillStyle = 'green';
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = 'yellow';
+        ctx.beginPath();
+        ctx.moveTo(x + w / 2, y + 5);
+        ctx.lineTo(x + w - 5, y + h / 2);
+        ctx.lineTo(x + w / 2, y + h - 5);
+        ctx.lineTo(x + 5, y + h / 2);
+        ctx.fill();
+        ctx.fillStyle = 'darkblue';
+        ctx.beginPath();
+        ctx.arc(x + w / 2, y + h / 2, h / 7, 0, 7);
+        ctx.fill();
+    } 
+    else if (id === 'ARGENTINA') {
+        ctx.fillStyle = 'deepskyblue';
+        ctx.fillRect(x, y, w, h / 3);
+        ctx.fillRect(x, y + 2 * h / 3, w, h / 3);
+        ctx.fillStyle = 'gold';
+        ctx.beginPath();
+        ctx.arc(x + w / 2, y + h / 2, h / 8, 0, 7);
+        ctx.fill();
+    } 
+    else if (id === 'GERMANY') {
+        ctx.fillStyle = 'black';
+        ctx.fillRect(x, y, w, h / 3);
+        ctx.fillStyle = 'red';
+        ctx.fillRect(x, y + h / 3, w, h / 3);
+        ctx.fillStyle = 'gold';
+        ctx.fillRect(x, y + 2 * h / 3, w, h / 3);
+    } 
+    else if (id === 'JAPAN') {
+        ctx.fillStyle = 'white';
+        ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = 'red';
+        ctx.beginPath();
+        ctx.arc(x + w / 2, y + h / 2, h / 3.5, 0, 7);
+        ctx.fill();
+    }
+    ctx.restore();
+}
+
+function build() { const cg = document.getElementById('countries'), kg = document.getElementById('clubs'); cg.innerHTML = ''; kg.innerHTML = ''; teams.forEach((n, i) => { const c = document.createElement('div'); c.className='card'; c.onclick=()=>{ document.querySelectorAll('.card').forEach(x=>x.classList.remove(turn==1?'p1-sel':'p2-sel')); c.classList.add(turn==1?'p1-sel':'p2-sel'); if(turn==1) p1Data=n; else p2Data=n; }; const can = document.createElement('canvas'); can.width = 100; can.height = 60; drawF(can.getContext('2d'), 0, 0, 100, 60, n); c.innerHTML = `<div class="f-preview" style="background: url(${can.toDataURL()}) center/cover"></div><div class="team-name">${n}<br><span style="color:#f1c40f;font-size:7px;">${players[n]}</span></div>`; (i < 10 ? cg : kg).appendChild(c); }); }
+function setMode(m) { mode=m; document.getElementById('m1-btn').style.background=m==1?'#2ecc71':'#444'; document.getElementById('m2-btn').style.background=m==2?'#2ecc71':'#444'; }
+function confSelection() { if(turn==1 && p1Data) { turn=2; document.getElementById('info').innerText=(mode==1)?"BOT TANLANG":"PLAYER 2 TANLANG"; } else if(turn==2 && p2Data) { startGame(); } }
+
+let p1, p2, ball, keys={}, mK={a:0,d:0,w:0,f:0,l:0,r:0,u:0,m:0};
+function mD(k){ mK[k]=1; } function mU(k){ mK[k]=0; }
+window.onkeydown=e=>keys[e.code]=true; window.onkeyup=e=>keys[e.code]=false;
+
+function startGame() { 
+    document.getElementById('ui').style.display='none'; document.getElementById('hud').style.display='flex'; document.getElementById('exit').style.display='block'; document.getElementById('controls').style.display='flex';
+    document.getElementById('p1t').innerText=p1Data; document.getElementById('p1n').innerText=players[p1Data];
+    document.getElementById('p2t').innerText=p2Data; document.getElementById('p2n').innerText=players[p2Data];
+    gameActive=true; resize(); 
+    p1={x:canvas.width*0.15,y:0,dy:0,r:canvas.width*0.045,s:0,id:p1Data}; 
+    p2={x:canvas.width*0.85,y:0,dy:0,r:canvas.width*0.045,s:0,id:p2Data}; 
+    ball={x:canvas.width/2,y:150,dx:0,dy:0,r:canvas.width*0.02};
+    const itv = setInterval(()=>{ if(gameActive && timer>0) { timer--; document.getElementById('tm').innerText=timer; if(timer<=0){ gameActive=false; clearInterval(itv); alert("TAMOM! "+p1.s+":"+p2.s); location.reload(); } } },1000); 
+    loop(); 
+}
+
+function resize() { canvas.width=window.innerWidth; canvas.height=window.innerHeight; }
+
+function update() {
+    if(!gameActive) return;
+    const g=0.8, floor=canvas.height-60, speed = 10; // Original tezlikka yaqinroq qiymat
+    if((keys['KeyA'] || mK.a) && p1.x>p1.r) p1.x-=speed; if((keys['KeyD'] || mK.d) && p1.x<canvas.width/2-p1.r) p1.x+=speed; if((keys['KeyW'] || mK.w) && p1.y>=floor-p1.r) p1.dy=-17;
+    if(mode==2) { if((keys['ArrowLeft'] || mK.l) && p2.x>canvas.width/2+p2.r) p2.x-=speed; if((keys['ArrowRight'] || mK.r) && p2.x<canvas.width-p2.r) p2.x+=speed; if((keys['ArrowUp'] || mK.u) && p2.y>=floor-p2.r) p2.dy=-17; }
+    else { if(ball.x>canvas.width/2) { if(p2.x<ball.x-20) p2.x+=speed*0.7; else if(p2.x>ball.x+20) p2.x-=speed*0.7; if(ball.y<p2.y && Math.random()<0.05) p2.dy=-17; if(Math.hypot(p2.x-ball.x,p2.y-ball.y)<100) mK.m=1; else mK.m=0; } }
+    [p1, p2].forEach(p => { p.dy+=g; p.y+=p.dy; if(p.y>floor-p.r) { p.y=floor-p.r; p.dy=0; } let d=Math.hypot(p.x-ball.x, p.y-ball.y); if(d<p.r+ball.r) { let kick=(p===p1 && (keys['KeyF']||mK.f)) || (p===p2 && (keys['KeyM']||mK.m)); let a=Math.atan2(ball.y-p.y, ball.x-p.x); let pow=kick?23:12; ball.dx=Math.cos(a)*pow; ball.dy=Math.sin(a)*pow-(kick?19:3); } });
+    ball.dy+=g*0.55; ball.x+=ball.dx; ball.y+=ball.dy; ball.dx*=0.985; if(ball.y>floor-ball.r) { ball.y=floor-ball.r; ball.dy*=-0.65; }
+    if(ball.x<ball.r) { if(ball.y>floor-160) goal(2); else { ball.x=ball.r; ball.dx*=-0.8; } } if(ball.x>canvas.width-ball.r) { if(ball.y>floor-160) goal(1); else { ball.x=canvas.width-ball.r; ball.dx*=-0.8; } }
+}
+
+function goal(w) { gameActive=false; if(w==1) p1.s++; else p2.s++; document.getElementById('s1').innerText=p1.s; document.getElementById('s2').innerText=p2.s; document.getElementById('goal').style.display='block'; setTimeout(()=>{ if(timer>0){ document.getElementById('goal').style.display='none'; ball={x:canvas.width/2,y:150,dx:0,dy:0,r:canvas.width*0.02}; gameActive=true; } },2000); }
+
+function draw() { 
+    ctx.fillStyle='#1e272e'; ctx.fillRect(0,0,canvas.width, canvas.height); 
+    ctx.fillStyle='#2ecc71'; ctx.fillRect(0, canvas.height-60, canvas.width, 60); 
+    ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(canvas.width/2, canvas.height); ctx.lineTo(canvas.width/2, 0); ctx.stroke();
+    ctx.beginPath(); ctx.arc(canvas.width/2, canvas.height-60, 50, 0, Math.PI*2); ctx.stroke();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=canvas.width*0.008; ctx.strokeRect(-5, canvas.height-210, 85, 150); ctx.strokeRect(canvas.width-80, canvas.height-210, 85, 150); 
+    [p1, p2].forEach(p => { 
+        ctx.save(); ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.clip(); drawF(ctx, p.x-p.r, p.y-p.r, p.r*2, p.r*2, p.id); ctx.restore(); 
+        ctx.fillStyle='white';
+        ctx.beginPath(); ctx.arc(p.x + (p === p1 ? 10 : -10), p.y - 5, 5, 0, 7); ctx.fill();
+        ctx.fillStyle='black'; ctx.beginPath(); ctx.arc(p.x + (p === p1 ? 12 : -12), p.y - 5, 2, 0, 7); ctx.fill();
+    });
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2); ctx.fill();
+    // To'pga chiziqlar (oddiygina)
+    ctx.strokeStyle='black'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(ball.x-ball.r, ball.y); ctx.lineTo(ball.x+ball.r, ball.y); ctx.stroke();
+}
+
+function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+// O'yinni ishga tushirish
+window.onload = () => {
+    build();
+    setMode(1);
+    resize();
+};
+
+window.onresize = resize;
+</script>
+</body>
+</html>

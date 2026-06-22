@@ -1,0 +1,253 @@
+
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Chizmali yo'l</title>
+    <style>
+        :root { --bg-grad: linear-gradient(#c2e9fb, #a1c4fd); }
+        body { margin: 0; overflow: hidden; background: #81b1b0; font-family: 'Arial Black', sans-serif; user-select: none; }
+        canvas { display: block; background: var(--bg-grad); touch-action: none; width: 100vw; height: 100vh; }
+
+        .ui-top { position: absolute; top: 15px; left: 20px; z-index: 10; }
+        .lvl-txt { font-size: clamp(20px, 5vw, 35px); color: #ffeb3b; text-shadow: 2px 2px 0 #000; }
+
+        .overlay { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; 
+                   background: rgba(0,0,0,0.8); color: white; z-index: 100; backdrop-filter: blur(5px); padding: 20px; }
+        
+        .modal { background: white; padding: 25px; border-radius: 25px; text-align: center; color: #333; 
+                 width: 100%; max-width: 400px; border: 4px solid #444; box-shadow: 0 8px 0 #888; box-sizing: border-box; }
+        
+        h1 { margin: 0 0 10px; font-size: 22px; color: #ff4757; text-transform: uppercase; }
+        p { font-size: 16px; color: #666; margin-bottom: 20px; }
+
+        .btn-stack { display: flex; flex-direction: column; gap: 10px; }
+        .btn { padding: 15px; border: none; border-radius: 15px; font-size: 18px; font-weight: bold; color: white; 
+               cursor: pointer; text-transform: uppercase; transition: 0.2s; position: relative; width: 100%; }
+        .btn:active { top: 4px; box-shadow: none !important; }
+        
+        .btn-next { background: #2ed573; box-shadow: 0 5px 0 #26af5e; }
+        .btn-retry { background: #ffa502; box-shadow: 0 5px 0 #e69500; }
+        .btn-menu { background: #1e90ff; box-shadow: 0 5px 0 #1c7cd6; }
+
+        .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; max-height: 40vh; overflow-y: auto; 
+                margin-top: 15px; padding: 10px; background: #eee; border-radius: 15px; }
+        .lvl-node { aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center;
+                    background: white; border-radius: 10px; cursor: pointer; font-weight: bold; 
+                    border: 2px solid #ccc; color: #333; font-size: 14px; }
+        .lvl-node.locked { background: #bbb; opacity: 0.6; cursor: not-allowed; }
+        .lvl-node.unlocked:hover { background: #ffeb3b; }
+    </style>
+</head>
+<body>
+
+    <div class="ui-top"><div class="lvl-txt" id="display-lvl">LEVEL: 1</div></div>
+
+    <div id="win-screen" class="overlay"><div class="modal">
+        <h1>G'ALABA! 🏆</h1><p>Mashina eson-omon o'tdi!</p>
+        <div class="btn-stack">
+            <button class="btn btn-next" onclick="game.nextLevel()">DAVOM ETISH</button>
+            <button class="btn btn-retry" onclick="game.restart()">QAYTA O'YNASH</button>
+            <button class="btn btn-menu" onclick="game.openMenu()">MENU</button>
+        </div>
+    </div></div>
+
+    <div id="lose-screen" class="overlay"><div class="modal">
+        <h1 style="color: #555;">YENGILDINGIZ! 💀</h1><p>Ko'prikni mustahkamroq chizing.</p>
+        <div class="btn-stack">
+            <button class="btn btn-retry" onclick="game.restart()">QAYTA URINISH</button>
+            <button class="btn btn-menu" onclick="game.openMenu()">MENU</button>
+        </div>
+    </div></div>
+
+    <div id="menu-screen" class="overlay"><div class="modal">
+        <h1>LEVELLAR</h1><div id="lvl-grid" class="grid"></div>
+        <button class="btn btn-retry" style="margin-top:15px" onclick="game.hideScreens()">YOPISH</button>
+    </div></div>
+
+    <canvas id="gameCanvas"></canvas>
+
+<script>
+class DrawBridge {
+    constructor() {
+        this.canvas = document.getElementById('gameCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.resize();
+        
+        this.unlocked = parseInt(localStorage.getItem('bridge_v2_lvl')) || 1;
+        this.currentLvl = 1;
+        this.path = [];
+        this.drawing = false;
+        this.active = false;
+        
+        // Mashina o'lchami kichraytirildi (telfon uchun qulay)
+        this.car = { x: 0, y: 0, w: 60, h: 40, rot: 0, vy: 0, speed: 4 };
+        this.platforms = [];
+        this.saws = [];
+        this.finishX = 0;
+
+        window.addEventListener('resize', () => this.resize());
+        this.bindEvents();
+        this.start(1);
+        this.loop();
+    }
+
+    resize() {
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
+    }
+
+    bindEvents() {
+        const getPos = (e) => {
+            let t = e.touches ? e.touches[0] : e;
+            let rect = this.canvas.getBoundingClientRect();
+            return { x: t.clientX - rect.left, y: t.clientY - rect.top };
+        };
+        const onDown = (e) => {
+            if (this.active || this.isOverlayOn()) return;
+            this.path = [getPos(e)];
+            this.drawing = true;
+        };
+        const onMove = (e) => {
+            if (!this.drawing) return;
+            let p = getPos(e);
+            let last = this.path[this.path.length - 1];
+            if (Math.hypot(p.x - last.x, p.y - last.y) > 5) this.path.push(p);
+        };
+        const onUp = () => {
+            if (this.drawing && this.path.length > 5) this.active = true;
+            this.drawing = false;
+        };
+        this.canvas.addEventListener('mousedown', onDown);
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+        this.canvas.addEventListener('touchstart', onDown);
+        window.addEventListener('touchmove', onMove, {passive: false});
+        window.addEventListener('touchend', onUp);
+    }
+
+    isOverlayOn() { return Array.from(document.querySelectorAll('.overlay')).some(el => el.style.display === 'flex'); }
+
+    start(n) {
+        this.currentLvl = n; this.path = []; this.active = false;
+        this.car.x = 40; this.car.rot = 0; this.car.vy = 0;
+        let gap = 120 + (n * 10);
+        let startW = 120;
+        let p1Y = this.canvas.height * 0.7; 
+        let p2Y = p1Y - (Math.sin(n * 0.4) * 40);
+        this.platforms = [
+            { x: 0, y: p1Y, w: startW },
+            { x: startW + gap, y: p2Y, w: 400 }
+        ];
+        this.car.y = p1Y - this.car.h;
+        this.finishX = startW + gap + 100;
+        this.saws = [];
+        if (n > 2) {
+            let count = Math.min(Math.floor(n/4) + 1, 5);
+            for (let i = 0; i < count; i++) {
+                this.saws.push({
+                    x: startW + 50 + Math.random() * (gap - 100),
+                    y: p1Y - 80 + Math.random() * 100,
+                    r: 18 + (n / 4), rot: 0
+                });
+            }
+        }
+        document.getElementById('display-lvl').innerText = "LEVEL: " + n;
+        this.hideScreens();
+    }
+
+    update() {
+        if (!this.active) return;
+        this.car.x += this.car.speed;
+        let sx = this.car.x + this.car.w / 2;
+        let groundY = null;
+        let onCustomPath = false;
+
+        this.platforms.forEach(p => { if (sx >= p.x && sx <= p.x + p.w) groundY = p.y; });
+
+        if (!groundY) {
+            for (let i = 0; i < this.path.length - 1; i++) {
+                let p1 = this.path[i], p2 = this.path[i+1];
+                if (sx >= Math.min(p1.x, p2.x) && sx <= Math.max(p1.x, p2.x)) {
+                    let r = (sx - p1.x) / (p2.x - p1.x);
+                    groundY = p1.y + (p2.y - p1.y) * r;
+                    let targetRot = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+                    this.car.rot += (targetRot - this.car.rot) * 0.25; // Silliq burilish
+                    onCustomPath = true;
+                    break;
+                }
+            }
+        }
+
+        if (groundY !== null) {
+            this.car.y = groundY - this.car.h + 10;
+            this.car.vy = 0;
+            if (!onCustomPath) this.car.rot *= 0.85; // Platformada to'g'ri turish
+        } else {
+            this.car.vy += 0.8; this.car.y += this.car.vy; this.car.rot += 0.1;
+            if (this.car.y > this.canvas.height) this.lose();
+        }
+
+        this.saws.forEach(s => {
+            let dx = sx - s.x, dy = (this.car.y + this.car.h/2) - s.y;
+            if (Math.hypot(dx, dy) < s.r + 15) this.lose();
+        });
+        if (this.car.x > this.finishX) this.win();
+    }
+
+    draw() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.fillStyle = '#6a9493'; this.ctx.beginPath();
+        this.ctx.moveTo(0, this.canvas.height*0.7); this.ctx.lineTo(200, this.canvas.height*0.6); 
+        this.ctx.lineTo(this.canvas.width, this.canvas.height*0.75); this.ctx.lineTo(this.canvas.width, this.canvas.height); 
+        this.ctx.lineTo(0, this.canvas.height); this.ctx.fill();
+
+        this.platforms.forEach(p => {
+            this.ctx.fillStyle = '#4caf50'; this.ctx.fillRect(p.x, p.y, p.w, this.canvas.height);
+            this.ctx.fillStyle = '#388e3c'; this.ctx.fillRect(p.x, p.y, p.w, 12);
+        });
+
+        this.ctx.font = "40px Arial"; this.ctx.fillText("🚩", this.finishX, this.platforms[1].y - 10);
+
+        if (this.path.length > 1) {
+            this.ctx.strokeStyle = '#222'; this.ctx.lineWidth = 10; this.ctx.lineCap = 'round';
+            this.ctx.beginPath();
+            this.path.forEach((p, i) => i === 0 ? this.ctx.moveTo(p.x, p.y) : this.ctx.lineTo(p.x, p.y));
+            this.ctx.stroke();
+        }
+
+        this.saws.forEach(s => {
+            s.rot += 0.1; this.ctx.save(); this.ctx.translate(s.x, s.y); this.ctx.rotate(s.rot);
+            this.ctx.font = `${s.r * 2.5}px Arial`; this.ctx.textAlign = 'center'; this.ctx.textBaseline = 'middle';
+            this.ctx.fillText("⚙", 0, 0); this.ctx.restore();
+        });
+
+        this.ctx.save(); this.ctx.translate(this.car.x + this.car.w / 2, this.car.y + this.car.h / 2);
+        this.ctx.rotate(this.car.rot); this.ctx.scale(-1, 1); this.ctx.font = "60px Arial";
+        this.ctx.textAlign = 'center'; this.ctx.textBaseline = 'middle'; this.ctx.fillText("🚓", 0, 0); this.ctx.restore();
+    }
+
+    loop() { this.update(); this.draw(); requestAnimationFrame(() => this.loop()); }
+    win() { this.active = false; if (this.currentLvl == this.unlocked) { this.unlocked++; localStorage.setItem('bridge_v2_lvl', this.unlocked); }
+            document.getElementById('win-screen').style.display = 'flex'; }
+    lose() { this.active = false; document.getElementById('lose-screen').style.display = 'flex'; }
+    restart() { this.start(this.currentLvl); }
+    nextLevel() { if (this.currentLvl < 100) this.start(this.currentLvl + 1); }
+    openMenu() {
+        const grid = document.getElementById('lvl-grid'); grid.innerHTML = '';
+        for (let i = 1; i <= 100; i++) {
+            const el = document.createElement('div');
+            let locked = i > this.unlocked;
+            el.className = `lvl-node ${locked ? 'locked' : 'unlocked'}`; el.innerText = i;
+            if (!locked) el.onclick = () => this.start(i);
+            grid.appendChild(el);
+        }
+        this.hideScreens(); document.getElementById('menu-screen').style.display = 'flex';
+    }
+    hideScreens() { document.querySelectorAll('.overlay').forEach(o => o.style.display = 'none'); }
+}
+const game = new DrawBridge();
+</script>
+</body>
+</html>

@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brick Breaker</title>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #fff;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        h1 { margin: 5px 0; font-size: 1.8rem; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        .stats-container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            background: #2a2a2a;
+            padding: 8px 20px;
+            border-radius: 20px;
+            border: 1px solid #444;
+        }
+        .stat-item span { color: #00ffcc; }
+        #canvas-wrapper { position: relative; }
+        canvas {
+            background: #111;
+            border: 4px solid #333;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+        }
+        .modal {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            border-radius: 6px;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+        .modal h2 { margin-bottom: 15px; font-size: 2rem; color: #ff4444; }
+        .modal.win h2 { color: #00ffcc; }
+        button {
+            padding: 10px 25px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #111;
+            background: #00ffcc;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+            box-shadow: 0 4px 10px rgba(0, 255, 204, 0.3);
+        }
+        button:hover { transform: scale(1.05); background: #00e6b8; }
+    </style>
+</head>
+<body>
+
+    <h1>Bloklar va Toshlar</h1>
+    
+    <div class="stats-container">
+        <div class="stat-item">Daraja: <span id="levelDisplay">1</span>/100</div>
+        <div class="stat-item">Hisob: <span id="scoreDisplay">0</span></div>
+    </div>
+
+    <div id="canvas-wrapper">
+        <canvas id="gameCanvas" width="480" height="320"></canvas>
+        
+        <div id="gameModal" class="modal">
+            <h2 id="modalTitle">O'yin Tugadi!</h2>
+            <button id="restartBtn" onclick="restartGame()">Qayta Boshlash</button>
+        </div>
+    </div>
+
+<script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const scoreDisplay = document.getElementById("scoreDisplay");
+    const levelDisplay = document.getElementById("levelDisplay");
+    const gameModal = document.getElementById("gameModal");
+    const modalTitle = document.getElementById("modalTitle");
+
+    let score = 0;
+    let currentLevel = 1;
+    let isGameOver = false;
+    let animationFrameId;
+
+    let ballRadius = 6;
+    let x, y, dx, dy;
+    let paddleHeight = 10;
+    let paddleWidth, paddleX;
+    
+    const brickRowCount = 4;
+    const brickColumnCount = 7;
+    const brickWidth = 56;
+    const brickHeight = 16;
+    const brickPadding = 6;
+    const brickOffsetTop = 25;
+    const brickOffsetLeft = 25;
+    let bricks = [];
+
+    let rightPressed = false;
+    let leftPressed = false;
+
+    document.addEventListener("keydown", keyDownHandler, false);
+    document.addEventListener("keyup", keyUpHandler, false);
+    document.addEventListener("mousemove", mouseMoveHandler, false);
+
+    function keyDownHandler(e) {
+        if(e.key === "Right" || e.key === "ArrowRight") rightPressed = true;
+        if(e.key === "Left" || e.key === "ArrowLeft") leftPressed = true;
+    }
+
+    function keyUpHandler(e) {
+        if(e.key === "Right" || e.key === "ArrowRight") rightPressed = false;
+        if(e.key === "Left" || e.key === "ArrowLeft") leftPressed = false;
+    }
+
+    function mouseMoveHandler(e) {
+        let relativeX = e.clientX - canvas.getBoundingClientRect().left;
+        if(relativeX > 0 && relativeX < canvas.width) {
+            paddleX = relativeX - paddleWidth / 2;
+        }
+    }
+
+    function initLevel() {
+        // Sharcha tezligi 1.8 ga tushirildi (avval 2.8 edi) va har levelda juda sekin oshadi
+        let speed = 2 + (currentLevel * 0.03);
+        x = canvas.width / 2;
+        y = canvas.height - 30;
+        dx = speed * (Math.random() > 0.5 ? 1 : -1);
+        dy = -speed;
+
+        // Platforma eni endi keskin kichraymaydi
+        paddleWidth = Math.max(85 - (currentLevel * 0.2), 50);
+        paddleX = (canvas.width - paddleWidth) / 2;
+
+        bricks = [];
+        for(let c = 0; c < brickColumnCount; c++) {
+            bricks[c] = [];
+            for(let r = 0; r < brickRowCount; r++) {
+                let isStone = Math.random() < (0.1 + (currentLevel * 0.005)) && r < 2;
+                let lives = isStone ? 2 : 1; 
+                bricks[c][r] = { x: 0, y: 0, status: lives, maxStatus: lives };
+            }
+        }
+        levelDisplay.innerText = currentLevel;
+    }
+
+    function collisionDetection() {
+        let activeBricks = 0;
+        for(let c = 0; c < brickColumnCount; c++) {
+            for(let r = 0; r < brickRowCount; r++) {
+                let b = bricks[c][r];
+                if(b.status > 0) {
+                    activeBricks++;
+                    if(x > b.x && x < b.x + brickWidth && y > b.y && y < b.y + brickHeight) {
+                        dy = -dy;
+                        b.status--;
+                        if(b.status === 0) {
+                            score += b.maxStatus === 2 ? 20 : 10;
+                        } else {
+                            score += 5;
+                        }
+                        scoreDisplay.innerText = score;
+                    }
+                }
+            }
+        }
+
+        if(activeBricks === 0 && !isGameOver) {
+            if(currentLevel >= 100) {
+                endGame(true);
+            } else {
+                currentLevel++;
+                initLevel();
+            }
+        }
+    }
+
+    function drawBall() {
+        ctx.beginPath();
+        ctx.arc(x, y, ballRadius, 0, Math.PI*2);
+        ctx.fillStyle = "#fff";
+        ctx.fill();
+        ctx.closePath();
+    }
+
+    function drawPaddle() {
+        ctx.beginPath();
+        ctx.rect(paddleX, canvas.height - paddleHeight, paddleWidth, paddleHeight);
+        ctx.fillStyle = "#00ffcc";
+        ctx.fill();
+        ctx.closePath();
+    }
+
+    function drawBricks() {
+        for(let c = 0; c < brickColumnCount; c++) {
+            for(let r = 0; r < brickRowCount; r++) {
+                let b = bricks[c][r];
+                if(b.status > 0) {
+                    let brickX = (c * (brickWidth + brickPadding)) + brickOffsetLeft;
+                    let brickY = (r * (brickHeight + brickPadding)) + brickOffsetTop;
+                    b.x = brickX;
+                    b.y = brickY;
+                    
+                    ctx.beginPath();
+                    ctx.rect(brickX, brickY, brickWidth, brickHeight);
+                    
+                    if(b.status === 2) {
+                        ctx.fillStyle = "#777777"; 
+                    } else if(b.maxStatus === 2 && b.status === 1) {
+                        ctx.fillStyle = "#aa7755"; 
+                    } else {
+                        ctx.fillStyle = "#3366ff"; 
+                    }
+                    
+                    ctx.fill();
+                    ctx.strokeStyle = "#111";
+                    ctx.strokeRect(brickX, brickY, brickWidth, brickHeight);
+                    ctx.closePath();
+                }
+            }
+        }
+    }
+
+    function draw() {
+        if(isGameOver) return;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawBricks();
+        drawBall();
+        drawPaddle();
+        collisionDetection();
+
+        if(x + dx > canvas.width - ballRadius || x + dx < ballRadius) dx = -dx;
+        if(y + dy < ballRadius) dy = -dy;
+        else if(y + dy > canvas.height - ballRadius) {
+            if(x > paddleX && x < paddleX + paddleWidth) {
+                let hitPos = (x - paddleX) / paddleWidth;
+                // Qaytish burchagi ham keskin bo'lmasligi uchun kamaytirildi
+                dx = 5 * (hitPos - 0.5);
+                dy = -dy;
+            } else {
+                endGame(false);
+                return;
+            }
+        }
+
+        // Platforma tezligi ham sharchaga moslab biroz yumshatildi
+        if(rightPressed && paddleX < canvas.width - paddleWidth) paddleX += 6;
+        if(leftPressed && paddleX > 0) paddleX -= 6;
+        x += dx;
+        y += dy;
+        animationFrameId = requestAnimationFrame(draw);
+    }
+
+    function endGame(isWin) {
+        isGameOver = true;
+        cancelAnimationFrame(animationFrameId);
+        gameModal.style.display = "flex";
+        if(isWin) {
+            gameModal.classList.add("win");
+            modalTitle.innerText = "G'ALABA! 100-darajani yutdingiz!";
+        } else {
+            gameModal.classList.remove("win");
+            modalTitle.innerHTML = `O'yin Tugadi!<br><span style="font-size:1.2rem; color:#aaa">Erishilgan daraja: ${currentLevel}</span>`;
+        }
+    }
+
+    function restartGame() {
+        score = 0;
+        currentLevel = 1;
+        isGameOver = false;
+        scoreDisplay.innerText = score;
+        gameModal.style.display = "none";
+        initLevel();
+        draw();
+    }
+
+    initLevel();
+    draw();
+</script>
+
+</body>
+</html>

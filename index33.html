@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ko‘rsichqonni ur</title>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    background: #1e1e2f;
+    color: white;
+}
+
+h1 {
+    margin-top: 20px;
+}
+
+#game {
+    display: grid;
+    grid-template-columns: repeat(3, 120px);
+    gap: 15px;
+    justify-content: center;
+    margin-top: 30px;
+}
+
+.hole {
+    width: 120px;
+    height: 120px;
+    background: #444;
+    border-radius: 50%;
+    position: relative;
+    cursor: pointer;
+}
+
+.mole {
+    width: 80px;
+    height: 80px;
+    background: brown;
+    border-radius: 50%;
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    display: none;
+}
+
+.active {
+    display: block;
+}
+
+#info {
+    margin-top: 20px;
+    font-size: 20px;
+}
+
+button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    font-size: 18px;
+    background: limegreen;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+}
+</style>
+</head>
+
+<body>
+
+<h1>🐹 Ko‘rsichqonni ur!</h1>
+
+<div id="game"></div>
+
+<div id="info">
+    Ochko: <span id="score">0</span> | 
+    Vaqt: <span id="time">30</span>
+</div>
+<button onclick="window.location.href='index.html';">Exit</button>
+<button onclick="startGame()">Boshlash</button>
+
+<script>
+const game = document.getElementById("game");
+const scoreEl = document.getElementById("score");
+const timeEl = document.getElementById("time");
+
+let score = 0;
+let time = 30;
+let currentHole = null;
+let gameInterval;
+let timerInterval;
+
+// 9 ta teshik yaratish
+for (let i = 0; i < 9; i++) {
+    const hole = document.createElement("div");
+    hole.classList.add("hole");
+
+    const mole = document.createElement("div");
+    mole.classList.add("mole");
+
+    hole.appendChild(mole);
+    game.appendChild(hole);
+
+    hole.addEventListener("click", () => {
+        if (mole.classList.contains("active")) {
+            score++;
+            scoreEl.textContent = score;
+            mole.classList.remove("active");
+        }
+    });
+}
+
+const holes = document.querySelectorAll(".hole");
+
+function randomMole() {
+    if (currentHole) {
+        currentHole.querySelector(".mole").classList.remove("active");
+    }
+
+    const index = Math.floor(Math.random() * holes.length);
+    currentHole = holes[index];
+    currentHole.querySelector(".mole").classList.add("active");
+}
+
+function startGame() {
+    score = 0;
+    time = 30;
+    scoreEl.textContent = score;
+    timeEl.textContent = time;
+
+    clearInterval(gameInterval);
+    clearInterval(timerInterval);
+
+    gameInterval = setInterval(randomMole, 700);
+
+    timerInterval = setInterval(() => {
+        time--;
+        timeEl.textContent = time;
+
+        if (time <= 0) {
+            clearInterval(gameInterval);
+            clearInterval(timerInterval);
+            alert("O‘yin tugadi! Ochko: " + score);
+        }
+    }, 1000);
+}
+</script>
+
+</body>
+</html>

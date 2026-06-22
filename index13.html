@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Space Warrior</title>
+    <style>
+        :root { --gold: #ffd700; --neon: #00ff00; --red: #ff4757; --bg: #050505; }
+        body { margin: 0; background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; touch-action: none; text-align: center; font-size: clamp(14px, 2vw, 18px); }
+        
+        .screen { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; padding: 5vw; overflow-y: auto; background: var(--bg); z-index: 100; }
+        #main-menu { display: flex; align-items: center; justify-content: center; }
+        
+        h1 { font-size: clamp(35px, 10vw, 70px) !important; margin: 20px 0; }
+        h2 { font-size: clamp(22px, 5vw, 35px); }
+
+        .wallet { font-size: clamp(18px, 4vw, 26px); color: var(--gold); font-weight: bold; margin: 15px auto; border: clamp(2px, 0.5vw, 4px) solid var(--gold); padding: 8px 30px; border-radius: 50px; width: fit-content; }
+        .btn { padding: clamp(12px, 3vw, 18px); margin: 10px; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: clamp(16px, 3vw, 20px); width: clamp(220px, 80vw, 300px); transition: 0.3s; }
+        .btn-play { background: var(--neon); color: #000; box-shadow: 0 0 20px var(--neon); }
+        .btn-shop { background: var(--gold); color: #000; }
+        
+        .btn-fixed-exit { background: var(--red); color: white; position: absolute; top: 15px; right: 15px; width: clamp(60px, 15vw, 85px); height: clamp(35px, 8vw, 45px); border-radius: 8px; font-weight: bold; z-index: 1000; cursor: pointer; border: 2px solid white; display: none; align-items: center; justify-content: center; font-size: 14px; }
+
+        .level-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(clamp(50px, 15vw, 70px), 1fr)); gap: 10px; width: 95%; max-width: 550px; margin: 0 auto; padding-bottom: 30px; }
+        .lvl-btn { aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; background: #222; border: 1px solid #444; border-radius: 10px; color: #555; font-weight: bold; font-size: clamp(14px, 3vw, 18px); }
+        .lvl-btn.unlocked { background: var(--neon); color: black; cursor: pointer; border: 2px solid white; }
+
+        .shop-container { width: 100%; max-width: 900px; margin: 0 auto; padding-bottom: 40px; }
+        .category { color: var(--neon); margin: 30px 0 10px; border-bottom: 2px solid #333; font-weight: bold; font-size: clamp(16px, 4vw, 20px); text-transform: uppercase; }
+        .shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(130px, 45%), 1fr)); gap: 12px; justify-content: center; }
+        .item { background: #151515; border: 2px solid #333; padding: 15px; border-radius: 12px; cursor: pointer; }
+        .item span { display: block; color: var(--gold); font-weight: bold; margin-top: 8px; font-size: 12px; }
+
+        canvas { background: #000; width: 100vw; height: 65vh; border-bottom: 4px solid #222; display: block; }
+        .controls { height: 35vh; width: 100%; display: flex; justify-content: center; align-items: center; background: #111; }
+        .fire-btn { width: clamp(90px, 25vw, 120px); height: clamp(90px, 25vw, 120px); background: var(--red); border-radius: 50%; border: 6px solid white; font-size: clamp(35px, 10vw, 50px); color: white; font-weight: bold; box-shadow: 0 0 30px rgba(255,0,0,0.5); user-select: none; }
+        
+        #hud { position: absolute; top: 15px; left: 0; right: 0; display: flex; justify-content: space-around; font-size: clamp(16px, 4vw, 22px); font-weight: bold; pointer-events: none; z-index: 10; width: 100%; }
+        #boss-ui { position: absolute; top: 55px; left: 50%; transform: translateX(-50%); width: clamp(180px, 70vw, 300px); display: none; z-index: 10; }
+        .hp-bar { width: 100%; height: 12px; background: #222; border: 2px solid #fff; border-radius: 10px; overflow: hidden; }
+        .hp-fill { height: 100%; background: var(--red); width: 100%; transition: 0.1s; }
+    </style>
+</head>
+<body>
+
+    <div id="global-exit" class="btn-fixed-exit" onclick="forceQuit()">EXIT</div>
+
+    <div id="main-menu" class="screen">
+        <h1 style="color:var(--neon);">SPACE WARRIOR</h1>
+        <div class="wallet">💰 <span class="pts-display">0</span> PTS</div>
+        <button class="btn btn-play" onclick="showScreen('level-screen')">LEVEL TANLASH</button>
+        <button class="btn btn-shop" onclick="showScreen('shop-screen')">SHOP (DO'KON)</button>
+    </div>
+
+    <div id="level-screen" class="screen">
+        <h2>100 TA LEVEL</h2>
+        <div class="level-grid" id="lvl-grid"></div>
+    </div>
+
+    <div id="shop-screen" class="screen">
+        <h2 style="color:var(--gold)">MEGA GALAXY STORE</h2>
+        <div class="wallet">💰 <span class="pts-display">0</span> PTS</div>
+        <div class="shop-container" id="shop-list"></div>
+    </div>
+
+    <div id="game-screen" class="screen" style="padding:0; overflow:hidden;">
+        <div id="hud">
+            <div style="color:var(--neon)">LVL: <span id="cur-lvl">1</span></div>
+            <div style="color:var(--gold)">PTS: <span id="cur-pts">0</span></div>
+            <div style="color:var(--red)">❤️: <span id="cur-lives">3</span></div>
+        </div>
+        <div id="boss-ui"><b style="color:red; font-size:12px;">BOSS HP</b><div class="hp-bar"><div id="hp-fill" class="hp-fill"></div></div></div>
+        <canvas id="canvas"></canvas>
+        <div class="controls"><button class="fire-btn" onmousedown="shoot()" ontouchstart="shoot()">A</button></div>
+    </div>
+
+    <div id="status-screen" class="screen" style="background:rgba(0,0,0,0.95); justify-content: center;">
+        <h1 id="status-title">G'ALABA!</h1>
+        <div class="wallet">HISOB: <span id="final-pts">0</span> PTS</div>
+        <button class="btn btn-play" onclick="startGame()">QAYTA BOSHLASH</button>
+        <button class="btn btn-shop" onclick="forceQuit()">BOSH SAHIFA</button>
+    </div>
+
+<script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    
+    let totalPts = parseInt(localStorage.getItem('pts_fixed_final')) || 0;
+    let unlockedLvl = parseInt(localStorage.getItem('lvl_fixed_final')) || 1;
+    let config = { gun: 1, shape: 'tri', color: '#00ff00', bots: 0 };
+    let gameActive = false, score = 0, lives = 3, currentLevel = 1;
+    let player = { x: 60, y: 200, w: 45, h: 45 };
+    let bullets = [], enemies = [], boss = null, bBullets = [];
+    let spN = 0, spM = 0, spB = 0;
+    let spawnInt;
+
+    window.addEventListener("keydown", (e) => { if(e.code === 'KeyA' && gameActive) shoot(); });
+
+    // Sudrab boshqarish (Telefon va Sichqoncha uchun)
+    const handleMove = (e) => {
+        if(!gameActive) return;
+        let clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        let rect = canvas.getBoundingClientRect();
+        let newY = clientY - rect.top - (player.h / 2);
+        if(newY >= 0 && newY <= canvas.height - player.h) player.y = newY;
+        if(e.cancelable) e.preventDefault();
+    };
+    canvas.addEventListener('touchmove', handleMove, { passive: false });
+    canvas.addEventListener('mousemove', handleMove);
+
+    function showScreen(id) {
+        document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
+        document.getElementById(id).style.display = 'flex';
+        document.getElementById('global-exit').style.display = (id === 'main-menu' || id === 'status-screen') ? 'none' : 'flex';
+        if(id === 'level-screen') renderLevels();
+        if(id === 'shop-screen') renderShop();
+        updateGlobalUI();
+    }
+
+    function updateGlobalUI() {
+        document.querySelectorAll('.pts-display').forEach(p => p.innerText = totalPts);
+        localStorage.setItem('pts_fixed_final', totalPts);
+        localStorage.setItem('lvl_fixed_final', unlockedLvl);
+    }
+
+    function forceQuit() { gameActive = false; clearInterval(spawnInt); showScreen('main-menu'); }
+
+    function renderLevels() {
+        const grid = document.getElementById('lvl-grid'); grid.innerHTML = '';
+        for(let i=1; i<=100; i++) {
+            let d = document.createElement('div');
+            d.className = `lvl-btn ${i <= unlockedLvl ? 'unlocked' : ''}`; d.innerText = i;
+            if(i <= unlockedLvl) d.onclick = () => { currentLevel = i; startGame(); };
+            grid.appendChild(d);
+        }
+    }
+
+    function renderShop() {
+        const cont = document.getElementById('shop-list');
+        cont.innerHTML = `
+            <div class="category">QUROLLAR</div>
+            <div class="shop-grid">
+                <div class="item" onclick="buy('gun',2,50)">2x Shot<span>50 PTS</span></div>
+                <div class="item" onclick="buy('gun',3,80)">3x Shot<span>80 PTS</span></div>
+                <div class="item" onclick="buy('gun',4,100)">4x Shot<span>100 PTS</span></div>
+                <div class="item" onclick="buy('gun',5,200)">5x Shot<span>200 PTS</span></div>
+            </div>
+            <div class="category">SHAKLLAR</div>
+            <div class="shop-grid">
+                <div class="item" onclick="buy('shape','circle',100)">Aylana<span>100</span></div>
+                <div class="item" onclick="buy('shape','rect',150)">Kvadrat<span>150</span></div>
+                <div class="item" onclick="buy('shape','star',200)">Yulduz<span>200</span></div>
+                <div class="item" onclick="buy('shape','ufo',300)">UFO<span>300</span></div>
+                <div class="item" onclick="buy('shape','diamond',500)">Olmos<span>500</span></div>
+            </div>
+            <div class="category">RANGLAR</div>
+            <div class="shop-grid" id="c-list"></div>
+            <div class="category">EFFEKTLAR</div>
+            <div class="shop-grid" id="e-list"></div>
+            <div class="category">SHERIK BOTLAR</div>
+            <div class="shop-grid">
+                <div class="item" onclick="buy('bots',1,500)">1 Bot<span>500</span></div>
+                <div class="item" onclick="buy('bots',2,1000)">2 Bot<span>1000</span></div>
+                <div class="item" onclick="buy('bots',3,2000)">3 Bot<span>2000</span></div>
+            </div>`;
+        const cls = ['red','blue','yellow','white','#444','pink','purple','orange','cyan','lime','teal','olive','brown','magenta','gray'];
+        cls.forEach(c => document.getElementById('c-list').innerHTML += `<div class="item" style="color:${c}" onclick="buy('color','${c}',50)">${c.toUpperCase()}<span>50</span></div>`);
+        const effs = ['rainbow','gold_rgb','neon','fire','ghost','shadow','pulse','chrome','dark','laser'];
+        effs.forEach(e => document.getElementById('e-list').innerHTML += `<div class="item" onclick="buy('color','${e}',150)">${e.toUpperCase()}<span>150</span></div>`);
+    }
+
+    function buy(t, v, p) {
+        if(totalPts >= p) { totalPts -= p; config[t] = v; updateGlobalUI(); alert("SOTIB OLINDI!"); }
+        else alert("PTS YETARLI EMAS!");
+    }
+
+    function startGame() {
+        showScreen('game-screen');
+        canvas.width = window.innerWidth; canvas.height = window.innerHeight * 0.65;
+        gameActive = true; lives = 3; score = 0; spN = 0; spM = 0; spB = 0;
+        bullets = []; enemies = []; bBullets = []; boss = null;
+        gameLoop();
+        spawnInt = setInterval(gameLogic, 1100);
+    }
+
+    function gameLogic() {
+        if(!gameActive) return;
+        if(spN < 20) { enemies.push({x:canvas.width+50, y:Math.random()*(canvas.height-50), w:35, h:35, hp:1, m:false}); spN++; }
+        else if(spM < 10) { enemies.push({x:canvas.width+50, y:Math.random()*(canvas.height-60), w:60, h:60, hp:10, m:true}); spM++; }
+        else if(spB < 5 && !boss) { boss = {x:canvas.width-120, y:50, w:110, h:110, hp:100+(currentLevel*10), max:100+(currentLevel*10), d:1}; spB++; document.getElementById('boss-ui').style.display='block'; }
+        else if(spN>=20 && spM>=10 && spB>=5 && !boss) { stopGame(true); }
+    }
+
+    function shoot() {
+        if(!gameActive) return;
+        for(let i=0; i<config.gun; i++) bullets.push({x:player.x+40, y:player.y+(i*12)-(config.gun*6)+20, w:22, h:6});
+    }
+
+    function drawObj(x, y, c, s, w=45, h=45) {
+        ctx.fillStyle = (c==='rainbow'||c==='gold_rgb') ? `hsl(${Date.now()/5 % 360},100%,50%)` : c;
+        ctx.beginPath();
+        if(s==='circle') ctx.arc(x+w/2, y+h/2, w/2, 0, Math.PI*2);
+        else if(s==='rect') ctx.rect(x,y,w,h);
+        else { ctx.moveTo(x,y); ctx.lineTo(x+w,y+h/2); ctx.lineTo(x,y+h); }
+        ctx.fill();
+    }
+
+    function gameLoop() {
+        if(!gameActive) return;
+        ctx.clearRect(0,0,canvas.width, canvas.height);
+        
+        drawObj(player.x, player.y, config.color, config.shape);
+        for(let i=0; i<config.bots; i++) drawObj(player.x-45, player.y+(i==0?-70:i==1?70:0), config.color, 'tri', 35, 35);
+
+        if(boss) {
+            boss.y += (4 + currentLevel*0.1) * boss.d; if(boss.y<0 || boss.y>canvas.height-110) boss.d *= -1;
+            ctx.fillStyle = "#8e44ad"; ctx.fillRect(boss.x, boss.y, boss.w, boss.h);
+            document.getElementById('hp-fill').style.width = (boss.hp/boss.max*100) + "%";
+            if(Math.random()<0.06) bBullets.push({x:boss.x, y:boss.y+55, w:25, h:12});
+        }
+
+        bullets.forEach((b, i) => {
+            b.x += 15; ctx.fillStyle = "#0ff"; ctx.fillRect(b.x,b.y,b.w,b.h);
+            if(boss && b.x > boss.x && b.x < boss.x+boss.w && b.y > boss.y && b.y < boss.y+boss.h) {
+                boss.hp--; bullets.splice(i,1); if(boss.hp <= 0) {boss=null; score+=200; document.getElementById('boss-ui').style.display='none';}
+            }
+        });
+
+        enemies.forEach((e, i) => {
+            e.x -= (3 + currentLevel*0.2); ctx.fillStyle = e.m?"orange":"red"; ctx.fillRect(e.x,e.y,e.w,e.h);
+            if(e.x < 0) { lives--; enemies.splice(i,1); if(lives<=0) stopGame(false); }
+            bullets.forEach((b, bi) => {
+                if(b.x < e.x+e.w && b.x+b.w > e.x && b.y < e.y+e.h && b.y+b.h > e.y) {
+                    e.hp--; bullets.splice(bi,1); if(e.hp <= 0) {enemies.splice(i,1); score+=e.m?50:10;}
+                }
+            });
+        });
+
+        bBullets.forEach((eb, i) => {
+            eb.x -= 10; ctx.fillStyle="orange"; ctx.fillRect(eb.x,eb.y,eb.w,eb.h);
+            if(eb.x < player.x+45 && eb.x > player.x && eb.y > player.y && eb.y < player.y+45) {
+                lives--; bBullets.splice(i,1); if(lives<=0) stopGame(false);
+            }
+        });
+
+        document.getElementById('cur-pts').innerText = score;
+        document.getElementById('cur-lives').innerText = lives;
+        document.getElementById('cur-lvl').innerText = currentLevel;
+        requestAnimationFrame(gameLoop);
+    }
+
+    function stopGame(win) {
+        gameActive = false; clearInterval(spawnInt);
+        totalPts += score; 
+        if(win) {
+            document.getElementById('status-title').innerText = "G'ALABA!"; 
+            document.getElementById('status-title').style.color = "var(--neon)";
+            if(currentLevel == unlockedLvl && unlockedLvl < 100) unlockedLvl++;
+        } else {
+            document.getElementById('status-title').innerText = "YUTQAZDINGIZ!";
+            document.getElementById('status-title').style.color = "var(--red)";
+        }
+        document.getElementById('final-pts').innerText = score;
+        showScreen('status-screen');
+    }
+
+    showScreen('main-menu');
+</script>
+</body>
+</html>
